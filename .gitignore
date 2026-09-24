@@ -1,0 +1,51 @@
+# Dossiers générés par Unity
+/[Ll]ibrary/
+/[Tt]emp/
+/[Oo]bj/
+/[Bb]uild/
+/[Bb]uilds/
+/[Ll]ogs/
+/[Uu]ser[Ss]ettings/
+/[Mm]emoryCaptures/
+/[Rr]ecordings/
+
+# Fichiers générés par les IDE
+.vs/
+.vscode/
+.idea/
+.gradle/
+*.csproj
+*.unityproj
+*.sln
+*.suo
+*.tmp
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+*.pidb.meta
+*.pdb.meta
+*.mdb.meta
+
+# Divers
+sysinfo.txt
+crashlytics-build.properties
+*.apk
+*.aab
+*.unitypackage
+/[Aa]ssets/[Ss]treamingAssets/aa*
+.DS_Store
+Thumbs.db
+
+# ML-Agents : résultats d'entraînement
+/results/
+/summaries/
+
+# Unity Version Control (Plastic SCM)
+.plastic/
+ignore.conf
