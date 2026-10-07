@@ -1,6 +1,7 @@
 # MTI881 – IA Foot (Unity)
 
-Petit jeu de football en 3D, conçu pour entraîner des agents par apprentissage par renforcement avec **Unity ML-Agents**.
+Petit jeu de football en 3D, conçu pour entraîner des agents par apprentissage par renforcement.
+L'entraînement passe par une chaîne maison (Unity + back-end Python / PyTorch) à la place de ML-Agents.
 
 - **Unity** 6000.3.10f1 (URP, Input System)
 - **Modèles 3D** : Lightning Poly – *Football Essentials 3D*
@@ -8,7 +9,8 @@ Petit jeu de football en 3D, conçu pour entraîner des agents par apprentissage
 ## Lancer le jeu
 1. Ouvrir le projet avec Unity 6000.3.10f1.
 2. Ouvrir la scène `Assets/Lightning Poly/Football Essentials 3D/Demo Scene/Demo Scene.unity`.
-3. Play : vous jouez les **Bleus** contre un bot (les **Rouges**).
+3. La scène est enregistrée en **mode entraînement** : les deux joueurs sont des agents IA.
+   Pour jouer vous-même les **Bleus** contre un bot : menu **IA Foot > Entraînement > Revenir au mode jeu**, puis Play.
 
 Pour monter une nouvelle scène : menu **IA Foot > Créer une nouvelle scène de match**,
 ou **IA Foot > Configurer le match dans la scène ouverte** dans une scène qui contient déjà les prefabs du pack.
@@ -31,4 +33,17 @@ ou **IA Foot > Configurer le match dans la scène ouverte** dans une scène qui 
 - **Pensé pour l'IA** : chaque joueur est piloté par un « cerveau » interchangeable (humain, bot scripté ou agent ML).
   L'arène est duplicable pour l'entraînement parallèle, gère le 2v2 et fournit un repère d'équipe symétrique pour le self-play.
 
-Documentation du code et intégration ML-Agents : [`Assets/IAFoot/README.md`](Assets/IAFoot/README.md).
+## Entraînement
+Unity enregistre les parties et les envoie par batchs à un back-end Python, qui renvoie des modèles
+(réseaux de neurones, modèles linéaires, arbres de décision...) installés à chaud sur les agents.
+
+1. Dans Unity : menu **IA Foot > Entraînement > Préparer la scène**.
+2. Dans `python/` : `pip install numpy`, puis `python train.py`.
+3. Play.
+
+Pour l'instant, le back-end affiche les données reçues et envoie un modèle à poids aléatoires :
+l'entraînement PyTorch reste à écrire.
+
+## Documentation
+- Code Unity et mise en place : [`Assets/IAFoot/README.md`](Assets/IAFoot/README.md)
+- Back-end Python, protocole et formats de modèles : [`python/README.md`](python/README.md)

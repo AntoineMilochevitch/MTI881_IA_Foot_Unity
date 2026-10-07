@@ -1,0 +1,3 @@
+numpy>=1.26
+# Optionnel pour l'instant (train.py fonctionne sans) ; nécessaire pour models.from_torch et pour l'entraînement.
+torch>=2.2

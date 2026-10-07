@@ -697,6 +697,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 7676349552702976533, guid: b2c23d075945f514a951a58dd9218b13, type: 3}
       insertIndex: -1
       addedObject: {fileID: 730210729}
+    - targetCorrespondingSourceObject: {fileID: 7676349552702976533, guid: b2c23d075945f514a951a58dd9218b13, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 730210731}
   m_SourcePrefab: {fileID: 100100000, guid: b2c23d075945f514a951a58dd9218b13, type: 3}
 --- !u!1 &730210726 stripped
 GameObject:
@@ -759,7 +762,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 730210726}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 3462ccbc802585e42990c0b710f59b52, type: 3}
   m_Name: 
@@ -801,6 +804,35 @@ MonoBehaviour:
   showTeamMarker: 1
   markerRadius: 0.13
   markerChargeGrowth: 0.6
+--- !u!114 &730210731
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 730210726}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6db2ee560f92f5540962e179bd3decbb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::IAFoot.Learning.FootAgent
+  behaviorName: Foot
+  decisionPeriod: 5
+  maxEpisodeSteps: 600
+  recordExperience: 1
+  seed: 0
+  maxTeammates: 1
+  maxOpponents: 2
+  positionScale: 2.5
+  velocityScale: 6
+  rewards:
+    goalScored: 1
+    goalConceded: -1
+    ballTowardGoalPerSecond: 0.1
+    ballTouch: 0.02
+    distanceToBallPerSecond: 0
+    tackleHit: 0
+    timePerSecond: -0.005
 --- !u!1 &797265275
 GameObject:
   m_ObjectHideFlags: 0
@@ -1804,9 +1836,9 @@ MonoBehaviour:
     - {fileID: 1417224129}
     - {fileID: 1315476642}
   startOnPlay: 1
-  kickoffFreezeDuration: 1
-  goalCelebrationDuration: 2.5
-  matchOverDuration: 4
+  kickoffFreezeDuration: 0
+  goalCelebrationDuration: 0
+  matchOverDuration: 0
   autoRestartMatch: 1
   rules:
   - {fileID: 11400000, guid: f12e1acfa72e88a45b9476c1be4d9e63, type: 2}
@@ -2140,6 +2172,61 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1902099162}
   m_CullTransparentMesh: 1
+--- !u!1 &1907251155
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1907251157}
+  - component: {fileID: 1907251156}
+  m_Layer: 0
+  m_Name: TrainingBridge
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1907251156
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1907251155}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3edf4f5feb1df794b97029a2fce469c8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::IAFoot.Learning.TrainingBridge
+  host: 127.0.0.1
+  port: 5005
+  connectOnStart: 1
+  retrySeconds: 2
+  batchSize: 1024
+  includeNextObservations: 1
+  flushOnExit: 1
+  timeScale: 1
+  initialModels: []
+  saveReceivedModels: 0
+  verboseLogs: 1
+--- !u!4 &1907251157
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1907251155}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1982971698
 GameObject:
   m_ObjectHideFlags: 0
@@ -2771,6 +2858,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 7676349552702976533, guid: b2c23d075945f514a951a58dd9218b13, type: 3}
       insertIndex: -1
       addedObject: {fileID: 6699000225308034557}
+    - targetCorrespondingSourceObject: {fileID: 7676349552702976533, guid: b2c23d075945f514a951a58dd9218b13, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 6699000225308034559}
   m_SourcePrefab: {fileID: 100100000, guid: b2c23d075945f514a951a58dd9218b13, type: 3}
 --- !u!1 &5775352912746720712 stripped
 GameObject:
@@ -2833,7 +2923,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 5775352912746720712}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 78354d2b3148b734ea5d403af0da17eb, type: 3}
   m_Name: 
@@ -2871,6 +2961,35 @@ MonoBehaviour:
   showTeamMarker: 1
   markerRadius: 0.13
   markerChargeGrowth: 0.6
+--- !u!114 &6699000225308034559
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5775352912746720712}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6db2ee560f92f5540962e179bd3decbb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::IAFoot.Learning.FootAgent
+  behaviorName: Foot
+  decisionPeriod: 5
+  maxEpisodeSteps: 600
+  recordExperience: 1
+  seed: 0
+  maxTeammates: 1
+  maxOpponents: 2
+  positionScale: 2.5
+  velocityScale: 6
+  rewards:
+    goalScored: 1
+    goalConceded: -1
+    ballTowardGoalPerSecond: 0.1
+    ballTouch: 0.02
+    distanceToBallPerSecond: 0
+    tackleHit: 0
+    timePerSecond: -0.005
 --- !u!1001 &7039718953558989847
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -3001,3 +3120,4 @@ SceneRoots:
   - {fileID: 8222589062179630555}
   - {fileID: 4161526443015504691}
   - {fileID: 1707055861}
+  - {fileID: 1907251157}

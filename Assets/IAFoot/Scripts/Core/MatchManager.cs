@@ -58,6 +58,8 @@ namespace IAFoot
         public List<MatchRule> rules = new List<MatchRule>();
 
         public event Action MatchStarted;
+        /// <summary>La manche en cours va être interrompue : déclenché juste AVANT le replacement (dernière observation valide).</summary>
+        public event Action RoundEnding;
         /// <summary>Joueurs et ballon viennent d'être replacés (idéal pour un EndEpisode / OnEpisodeBegin).</summary>
         public event Action RoundStarted;
         /// <summary>Fin du gel du coup d'envoi.</summary>
@@ -186,6 +188,9 @@ namespace IAFoot
 
         void StartRound()
         {
+            if (State != MatchState.Idle)
+                RoundEnding?.Invoke();
+
             RoundTime = 0f;
             ResetBall();
             PlacePlayers();

@@ -49,3 +49,9 @@ Thumbs.db
 # Unity Version Control (Plastic SCM)
 .plastic/
 ignore.conf
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
