@@ -44,6 +44,9 @@ namespace IAFoot
         public List<GoalZone> goals = new List<GoalZone>();
         public List<TeamSetup> teams = new List<TeamSetup>();
 
+        [Header("Apparitions aléatoires")]
+        public RoundSpawnRandomizer randomSpawns = new RoundSpawnRandomizer();
+
         [Header("Déroulement")]
         public bool startOnPlay = true;
         [Tooltip("Durée pendant laquelle les joueurs sont gelés au coup d'envoi.")]
@@ -84,6 +87,7 @@ namespace IAFoot
         readonly int[] scores = new int[TeamIdExtensions.Count];
         readonly List<PlayerController> allPlayers = new List<PlayerController>();
         float stateTimer;
+        bool spawnWarningShown;
 
         void Awake()
         {
@@ -194,6 +198,15 @@ namespace IAFoot
             RoundTime = 0f;
             ResetBall();
             PlacePlayers();
+            if (randomSpawns.enabled && !randomSpawns.TryPlace(this))
+            {
+                if (!spawnWarningShown)
+                    Debug.LogWarning("[IA Foot] Placement aléatoire impossible : utilisation des points fixes. " +
+                        "Vérifier la zone, le sol et les distances minimales dans MatchManager.", this);
+                spawnWarningShown = true;
+            }
+            else
+                spawnWarningShown = false;
             SetPlayersFrozen(true);
             State = MatchState.Kickoff;
             stateTimer = kickoffFreezeDuration;
@@ -249,7 +262,7 @@ namespace IAFoot
             {
                 foreach (PlayerController player in team.players)
                 {
-                    if (!player)
+                    if (!player || !player.isActiveAndEnabled)
                         continue;
                     player.Initialize(this, team.id);
                     allPlayers.Add(player);
@@ -273,7 +286,7 @@ namespace IAFoot
                 for (int i = 0; i < team.players.Count; i++)
                 {
                     PlayerController player = team.players[i];
-                    if (player)
+                    if (player && player.isActiveAndEnabled)
                         player.ResetState(GetSpawnPosition(team, i), facing);
                 }
             }
@@ -351,6 +364,7 @@ namespace IAFoot
 
         void OnDrawGizmos()
         {
+            randomSpawns?.DrawGizmo(transform);
             foreach (TeamSetup team in teams)
             {
                 Gizmos.color = team.color;

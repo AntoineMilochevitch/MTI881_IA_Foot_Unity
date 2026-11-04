@@ -6,6 +6,49 @@
 
 Ensuite, vérifier la taille des zones de but (boîtes colorées dans la vue Scene, objet `GoalTrigger`) et lancer Play.
 
+## Positions de départ aléatoires
+
+Dans `Arena > Match Manager`, ouvrir `Random Spawns` sous **Apparitions aléatoires**.
+Le tirage est activé par défaut, pour les joueurs actifs et le ballon, quel que soit leur contrôleur
+(humain, bot ou modèle). Il a lieu au début du match et à chaque nouvelle manche : but, timeout
+d'un agent, sortie du ballon ou appel à `RestartRound`.
+
+| Réglage | Valeur initiale | Effet |
+|---|---|---|
+| `Enabled` | coché | Décocher pour réutiliser exactement `BallSpawn` et les points des équipes. |
+| `Area Center` | `(0, 0)` | Centre X/Z dans le repère local de l'arène. |
+| `Area Size` | `(2.6, 1.4)` | Dimensions X/Z de la zone ; rectangle cyan dans la vue Scene. |
+| `Minimum Distance` | `0.4` | Distance horizontale minimale entre les centres de tous les objets. |
+| `Clearance` | `0.05` | Marge supplémentaire entre leurs empreintes et au bord de la zone. |
+| `Seed` | `0` | Nouvelle séquence à chaque lancement. Une graine positive reproduit la séquence des placements. |
+
+Les positions sont tirées dans toute la zone, sans réserver une moitié à chaque équipe.
+La zone initiale reste à l'intérieur du terrain de démonstration, à distance des cages.
+Pour un autre terrain, ajuster son centre et ses dimensions dans l'Inspector.
+Les hauteurs des points fixes sont conservées, les joueurs regardent vers leur but adverse,
+et les vitesses et états de jeu sont réinitialisés comme lors d'un coup d'envoi habituel.
+
+Le placement vérifie la présence d'un sol, l'absence de pénétration des colliders dans les obstacles
+ou les zones de but, et l'espacement des objets. Il est calculé entièrement avant d'être appliqué,
+avant les événements qui démarrent les épisodes. Si la zone est trop petite ou encombrée, les points
+fixes sont conservés et un avertissement apparaît dans la Console. Il faut alors corriger les réglages.
+Les joueurs inactifs au lancement sont ignorés, notamment dans une scène solo.
+
+Le générateur aléatoire est propre aux apparitions : il ne change pas celui des politiques ou du bot.
+Une graine fixe reproduit les placements avec la même scène, les mêmes objets actifs et les mêmes
+réglages, mais ne rend pas les actions ni la physique du match entièrement déterministes.
+Pour comparer des checkpoints, garder la même configuration d'apparitions et relancer Play entre
+les évaluations avec la même graine positive. Les observations, récompenses et messages du pont
+restent identiques ; aucun changement Python n'est nécessaire.
+
+Vérifications : hors Play, menu **IA Foot > Tests > Vérifier les apparitions aléatoires**.
+Elles couvrent le 2v2, le solo, les obstacles et buts, les seeds, les remises à zéro, l'ordre
+des événements, le repère de l'arène et les configurations impossibles. En ligne de commande :
+
+```powershell
+& 'C:\Program Files\Unity\Hub\Editor\6000.3.10f1\Editor\Unity.exe' -batchmode -nographics -projectPath . -executeMethod IAFoot.Editor.RandomSpawnChecks.RunBatch -logFile random-spawn-checks.log
+```
+
 ## Contrôles
 | Action | Joueur 1 | Joueur 2 | Manette |
 |---|---|---|---|

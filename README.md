@@ -28,7 +28,8 @@ ou **IA Foot > Configurer le match dans la scène ouverte** dans une scène qui 
   (intensité de 0 à 1 selon le temps d'appui), tacle qui étourdit l'adversaire, saut, animations procédurales.
 - **Ballon** : traînée de l'air, effet Magnus, résistance au roulement, anti-blocage contre les murs.
 - **Buts** : validés quand le ballon a entièrement franchi la ligne, puis animation de la cage.
-- **Match** : score et chrono affichés à l'écran, coup d'envoi avec le ballon au centre et les joueurs de chaque côté.
+- **Match** : score et chrono affichés à l'écran, nouvelles positions aléatoires du ballon et des joueurs à chaque manche.
+  Dans `Arena > Match Manager > Random Spawns`, décocher `Enabled` pour retrouver les points fixes.
   Règles modulaires : score limite, temps limite avec but en or, ballon sorti.
 - **Pensé pour l'IA** : chaque joueur est piloté par un « cerveau » interchangeable (humain, bot scripté ou agent ML).
   L'arène est duplicable pour l'entraînement parallèle, gère le 2v2 et fournit un repère d'équipe symétrique pour le self-play.
