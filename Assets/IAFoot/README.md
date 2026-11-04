@@ -43,10 +43,14 @@ restent identiques ; aucun changement Python n'est nécessaire.
 
 Vérifications : hors Play, menu **IA Foot > Tests > Vérifier les apparitions aléatoires**.
 Elles couvrent le 2v2, le solo, les obstacles et buts, les seeds, les remises à zéro, l'ordre
-des événements, le repère de l'arène et les configurations impossibles. En ligne de commande :
+des événements, le repère de l'arène et les configurations impossibles.
+La vérification en ligne de commande ajoute un vrai passage en Play avec `FootAgent` et
+`SimpleBotInput` : inscription des équipes avant `Start`, démarrage des épisodes et déplacement
+des deux joueurs après une remise en jeu aléatoire puis fixe. Le pont ne se connecte pas à Python.
+Exécuter cette commande dans une copie de test du projet : elle crée une scène temporaire.
 
 ```powershell
-& 'C:\Program Files\Unity\Hub\Editor\6000.3.10f1\Editor\Unity.exe' -batchmode -nographics -projectPath . -executeMethod IAFoot.Editor.RandomSpawnChecks.RunBatch -logFile random-spawn-checks.log
+& 'C:\Program Files\Unity\Hub\Editor\6000.3.10f1\Editor\Unity.exe' -batchmode -nographics -projectPath . -executeMethod IAFoot.Editor.RandomSpawnChecks.RunPlayModeBatch -logFile random-spawn-checks.log
 ```
 
 ## Contrôles

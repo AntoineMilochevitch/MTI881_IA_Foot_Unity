@@ -262,7 +262,9 @@ namespace IAFoot
             {
                 foreach (PlayerController player in team.players)
                 {
-                    if (!player || !player.isActiveAndEnabled)
+                    // Awake du MatchManager précède OnEnable des joueurs : isActiveAndEnabled
+                    // peut encore être faux pour un joueur pourtant actif dans la scène.
+                    if (!player || !player.enabled || !player.gameObject.activeInHierarchy)
                         continue;
                     player.Initialize(this, team.id);
                     allPlayers.Add(player);

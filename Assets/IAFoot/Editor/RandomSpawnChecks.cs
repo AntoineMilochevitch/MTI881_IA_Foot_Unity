@@ -1,14 +1,29 @@
 using System;
 using System.Collections.Generic;
 using UnityEditor;
+using UnityEditor.SceneManagement;
 using UnityEngine;
+using IAFoot.Learning;
 using Object = UnityEngine.Object;
 
 namespace IAFoot.Editor
 {
     /// <summary>Vérifications avec les vrais colliders Unity, sans scène ni asset de test à installer.</summary>
+    [InitializeOnLoad]
     public static class RandomSpawnChecks
     {
+        const string PlayCheckKey = "IAFoot.RandomSpawnChecks.PlayMode";
+        static MatchManager playingMatch;
+        static Vector3[] initialPositions;
+        static float sampleStart;
+        static bool checkingFixedMode;
+
+        static RandomSpawnChecks()
+        {
+            if (SessionState.GetBool(PlayCheckKey, false))
+                EditorApplication.update += CheckPlayMode;
+        }
+
         [MenuItem("IA Foot/Tests/Vérifier les apparitions aléatoires")]
         public static void Run()
         {
@@ -29,6 +44,94 @@ namespace IAFoot.Editor
         {
             try { Run(); EditorApplication.Exit(0); }
             catch (Exception error) { Debug.LogException(error); EditorApplication.Exit(1); }
+        }
+
+        /// <summary>Charge une vraie scène en Play : aucun Awake n'est appelé manuellement.</summary>
+        public static void RunPlayModeBatch()
+        {
+            if (!Application.isBatchMode)
+                throw new InvalidOperationException("Ce test crée une scène temporaire : utiliser un projet de test en batchmode.");
+            try
+            {
+                Run();
+                EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+                var fixture = new Fixture(2, initialize: false);
+                fixture.match.startOnPlay = true;
+                var bridge = new GameObject("TrainingBridge").AddComponent<TrainingBridge>();
+                var bridgeSettings = new SerializedObject(bridge);
+                bridgeSettings.FindProperty("connectOnStart").boolValue = false;
+                bridgeSettings.FindProperty("showOverlay").boolValue = false;
+                bridgeSettings.ApplyModifiedPropertiesWithoutUndo();
+                var agent = fixture.players[0].gameObject.AddComponent<FootAgent>();
+                var agentSettings = new SerializedObject(agent);
+                agentSettings.FindProperty("seed").intValue = 123;
+                agentSettings.ApplyModifiedPropertiesWithoutUndo();
+                fixture.players[1].gameObject.AddComponent<SimpleBotInput>();
+                EditorSceneManager.SaveScene(fixture.root.scene, "Assets/RandomSpawnPlayCheck.unity");
+                SessionState.SetBool(PlayCheckKey, true);
+                SessionState.SetFloat(PlayCheckKey + ".deadline", (float)EditorApplication.timeSinceStartup + 90f);
+                EditorApplication.update -= CheckPlayMode;
+                EditorApplication.update += CheckPlayMode;
+                EditorApplication.EnterPlaymode();
+            }
+            catch (Exception error) { FinishPlayCheck(error); }
+        }
+
+        static void CheckPlayMode()
+        {
+            try
+            {
+                if (EditorApplication.timeSinceStartup > SessionState.GetFloat(PlayCheckKey + ".deadline", 0f))
+                    throw new TimeoutException("Le test Play n'a pas terminé en 90 secondes.");
+                if (!EditorApplication.isPlaying || Time.time < 0.1f)
+                    return;
+                if (!playingMatch)
+                {
+                    playingMatch = Object.FindFirstObjectByType<MatchManager>();
+                    Require(playingMatch && playingMatch.AllPlayers.Count == 2,
+                        "Play : les deux joueurs actifs doivent être inscrits avant leur Start.");
+                    Require(playingMatch.State == MatchState.Playing, "Play : le match ne démarre pas.");
+                    foreach (PlayerController player in playingMatch.AllPlayers)
+                        Require(player.Match == playingMatch && !player.IsFrozen, "Play : joueur sans match ou gelé.");
+                    Require(Object.FindFirstObjectByType<FootAgent>().EpisodeActive, "Play : l'épisode IA ne démarre pas.");
+                    initialPositions = PlayingPositions();
+                    sampleStart = Time.time;
+                }
+                if (Time.time - sampleStart < 2f)
+                    return;
+                Vector3[] current = PlayingPositions();
+                for (int i = 0; i < current.Length; i++)
+                    Require(Vector3.ProjectOnPlane(current[i] - initialPositions[i], Vector3.up).magnitude > 0.01f,
+                        "Play : le joueur " + i + " reste immobile (aléatoire=" + !checkingFixedMode + ").");
+                if (!checkingFixedMode)
+                {
+                    checkingFixedMode = true;
+                    playingMatch.randomSpawns.enabled = false;
+                    playingMatch.RestartRound();
+                    Require(Object.FindFirstObjectByType<FootAgent>().EpisodeActive, "Play : épisode non redémarré.");
+                    initialPositions = PlayingPositions();
+                    sampleStart = Time.time;
+                    return;
+                }
+                Debug.Log("[IA Foot Tests] PASS : Play réel, agent et bot inscrits, épisodes actifs, déplacements après départ aléatoire et fixe.");
+                FinishPlayCheck(null);
+            }
+            catch (Exception error) { FinishPlayCheck(error); }
+        }
+
+        static Vector3[] PlayingPositions()
+        {
+            var positions = new Vector3[playingMatch.AllPlayers.Count];
+            for (int i = 0; i < positions.Length; i++) positions[i] = playingMatch.AllPlayers[i].Position;
+            return positions;
+        }
+
+        static void FinishPlayCheck(Exception error)
+        {
+            SessionState.SetBool(PlayCheckKey, false);
+            EditorApplication.update -= CheckPlayMode;
+            if (error != null) Debug.LogException(error);
+            EditorApplication.Exit(error == null ? 0 : 1);
         }
 
         static void BoundsSeparationAndResets()
@@ -211,7 +314,7 @@ namespace IAFoot.Editor
             public readonly BoxCollider floor;
             public readonly List<PlayerController> players = new List<PlayerController>();
 
-            public Fixture(int playerCount)
+            public Fixture(int playerCount, bool initialize = true)
             {
                 // Éloigne les tests de la scène ouverte, sans la fermer ni la modifier.
                 root.transform.position = new Vector3(1000f, 0f, 1000f);
@@ -224,7 +327,7 @@ namespace IAFoot.Editor
                 GameObject ball = Child("Ball", new Vector3(0f, 0.1f, 0f)).gameObject;
                 ball.AddComponent<SphereCollider>().radius = 0.05f;
                 match.ball = ball.AddComponent<SoccerBall>();
-                match.ball.SendMessage("Awake");
+                if (initialize) match.ball.SendMessage("Awake");
                 match.teams.Add(new TeamSetup { id = TeamId.Blue });
                 match.teams.Add(new TeamSetup { id = TeamId.Red });
                 for (int i = 0; i < playerCount; i++)
@@ -236,12 +339,12 @@ namespace IAFoot.Editor
                     capsule.height = 0.3f;
                     capsule.radius = 0.08f;
                     PlayerController player = obj.AddComponent<PlayerController>();
-                    player.SendMessage("Awake");
+                    if (initialize) player.SendMessage("Awake");
                     players.Add(player);
                     match.teams[i % 2].players.Add(player);
                     match.teams[i % 2].spawnPoints.Add(spawn);
                 }
-                match.SendMessage("Awake");
+                if (initialize) match.SendMessage("Awake");
             }
 
             Transform Child(string name, Vector3 localPosition)
