@@ -13,4 +13,4 @@ MonoBehaviour:
   m_Name: TimeLimitRule
   m_EditorClassIdentifier: Assembly-CSharp::IAFoot.TimeLimitRule
   matchDuration: 180
-  goldenGoalOnDraw: 1
+  goldenGoalOnDraw: 0

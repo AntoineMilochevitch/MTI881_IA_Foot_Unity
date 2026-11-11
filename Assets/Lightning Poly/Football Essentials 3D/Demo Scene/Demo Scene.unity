@@ -723,7 +723,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 868a51b1234bd504c853b81fc4c26916, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::IAFoot.PlayerController
-  team: 0
+  team: 1
   moveSpeed: 1.6
   acceleration: 12
   deceleration: 14
@@ -816,10 +816,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6db2ee560f92f5540962e179bd3decbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::IAFoot.Learning.FootAgent
-  behaviorName: Foot
+  behaviorName: FootSnapshot
   decisionPeriod: 5
   maxEpisodeSteps: 600
-  recordExperience: 1
+  recordExperience: 0
   seed: 0
   maxTeammates: 1
   maxOpponents: 2
@@ -830,7 +830,7 @@ MonoBehaviour:
     goalConceded: -1
     ballTowardGoalPerSecond: 0.1
     ballTouch: 0.02
-    distanceToBallPerSecond: 0
+    distanceToBallPerSecond: 0.005
     tackleHit: 0
     timePerSecond: -0.005
 --- !u!1 &797265275
@@ -1835,6 +1835,13 @@ MonoBehaviour:
     spawnPoints:
     - {fileID: 1417224129}
     - {fileID: 1315476642}
+  randomSpawns:
+    enabled: 1
+    areaCenter: {x: 0, y: 0}
+    areaSize: {x: 2.6, y: 1.4}
+    minimumDistance: 0.4
+    clearance: 0.05
+    seed: 0
   startOnPlay: 1
   kickoffFreezeDuration: 0
   goalCelebrationDuration: 0
@@ -2212,6 +2219,10 @@ MonoBehaviour:
   initialModels: []
   saveReceivedModels: 0
   verboseLogs: 1
+  statusLogInterval: 5
+  minEventLogGap: 2
+  rewardWindow: 20
+  showOverlay: 1
 --- !u!4 &1907251157
 Transform:
   m_ObjectHideFlags: 0
@@ -2987,7 +2998,7 @@ MonoBehaviour:
     goalConceded: -1
     ballTowardGoalPerSecond: 0.1
     ballTouch: 0.02
-    distanceToBallPerSecond: 0
+    distanceToBallPerSecond: 0.005
     tackleHit: 0
     timePerSecond: -0.005
 --- !u!1001 &7039718953558989847
