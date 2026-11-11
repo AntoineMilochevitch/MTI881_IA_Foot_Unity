@@ -55,7 +55,8 @@ namespace IAFoot.Learning
     }
 
     /// <summary>
-    /// Pont entre Unity et le back-end Python (un seul par scène, partagé par toutes les arènes) :
+    /// Pont entre Unity et le back-end Python (un seul par scène, partagé par toutes les arènes,
+    /// y compris les copies créées par l'<see cref="IAFoot.ArenaReplicator"/>) :
     /// - regroupe les transitions des agents et envoie un message "batch" dès que le seuil est atteint ;
     /// - reçoit les modèles ("set_model") et les installe immédiatement sur les agents concernés ;
     /// - reçoit les réglages ("set_config") : vitesse de simulation, taille de batch.
@@ -408,6 +409,7 @@ namespace IAFoot.Learning
                         ["id"] = agent.AgentId,
                         ["name"] = agent.name,
                         ["team"] = agent.TeamName,
+                        ["arena"] = agent.ArenaName,
                     });
                 }
 

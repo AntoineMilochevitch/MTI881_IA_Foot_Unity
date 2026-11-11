@@ -59,6 +59,8 @@ namespace IAFoot.Learning
 
         public int AgentId { get; private set; } = -1;
         public string TeamName => player ? player.Team.ToString() : string.Empty;
+        /// <summary>Nom de l'arène du joueur (plusieurs arènes en entraînement parallèle).</summary>
+        public string ArenaName => player && player.Match ? player.Match.name : string.Empty;
         public bool EpisodeActive => episodeActive;
         public float EpisodeReturn => episodeReturn;
         public int ModelVersion => channel != null ? channel.Policy.Version : 0;

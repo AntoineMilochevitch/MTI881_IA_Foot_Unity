@@ -20,7 +20,7 @@ L'ordre de lancement n'a pas d'importance, Unity se reconnecte tout seul.
 | `--model mlp\|linear\|tree\|none` | modèle de démonstration envoyé à la connexion (`none` : les agents restent en exploration aléatoire) |
 | `--resend-every N` | renvoie un nouveau modèle tous les N batchs (teste le remplacement à chaud) |
 | `--deterministic` | désactive l'exploration côté Unity |
-| `--time-scale 10` | accélère la simulation |
+| `--time-scale 10` | vitesse de la simulation Unity (défaut 10 ; `1` = temps réel) |
 | `--batch-size 2048` | change le seuil d'envoi des batchs |
 | `--show K`, `--verbose` | détail de K transitions par batch, noms des observations |
 | `--quiet` | masque les lignes de debug réseau |

@@ -66,7 +66,8 @@ Exécuter cette commande dans une copie de test du projet : elle crée une scèn
 Arena (MatchManager)          score, manches, règles, événements ; pas de singleton, donc duplicable
 ├── Ball (SoccerBall)         traînée de l'air, effet Magnus, roulement
 ├── Goal_Blue / Goal_Red
-│   └── GoalTrigger (GoalZone)  but validé quand le ballon est entièrement dedans, puis animation
+│   └── GoalTrigger (GoalZone)  but validé quand le ballon est entièrement dedans ET entré par l'ouverture
+│                               (face verte dans la vue Scene ; côté, arrière et dessus refusés), puis animation
 ├── Blue_Player_0 (PlayerController + PlayerVisuals + HumanPlayerInput)
 ├── Red_Player_0  (PlayerController + PlayerVisuals + SimpleBotInput)
 ├── SpawnPoints / BallSpawn
@@ -107,4 +108,46 @@ Mise en route :
 - **Adversaire fixe** : décocher `Record Experience` sur un agent, ou lui laisser le `SimpleBotInput`.
 - **Jouer sans Python** : cocher `Save Received Models` sur le `TrainingBridge`, puis glisser le fichier
   `.bytes` obtenu dans `Initial Models`.
-- **Entraînement parallèle** : dupliquer l'objet `Arena` en l'éloignant des autres ; un seul `TrainingBridge` suffit.
+- **Entraînement parallèle** : voir ci-dessous (N arènes à partir d'un prefab, un seul `TrainingBridge`).
+
+## Entraînement parallèle (N arènes)
+L'arène est enregistrée en prefab, puis dupliquée N fois au lancement. Chaque copie est un match
+indépendant, mais tous les agents parlent au même `TrainingBridge` :
+- les transitions des N arènes remplissent **le même batch** (un batch de 1024 se remplit N fois plus vite) ;
+- chaque modèle reçu de Python est installé **en une fois sur les agents de toutes les arènes**.
+
+Rien ne change côté Python : les trajectoires restent séparées par `agent_id` / `episode_id`, uniques
+dans toute la scène. Le message `hello` indique l'arène de chaque agent (`arena`) et `train.py` affiche
+le nombre d'arènes connectées.
+
+Mise en route (après **Préparer la scène**) :
+1. **IA Foot > Entraînement parallèle > 1. Enregistrer l'arène en prefab** → `Assets/IAFoot/Prefabs/Arena.prefab`.
+   L'arène de la scène devient une instance de ce prefab.
+2. **IA Foot > Entraînement parallèle > 2. Dupliquer l'arène** → crée l'objet `ArenaReplicator`.
+3. Régler `Arena Count` sur l'`ArenaReplicator`, puis Play.
+
+| Réglage (`ArenaReplicator`) | Défaut | Effet |
+|---|---|---|
+| `Arena Prefab` / `Scene Arena` | remplis par le menu | prefab dupliqué ; arène de la scène (n°0, origine de la grille) |
+| `Arena Count` | 32 | nombre total d'arènes, celle de la scène comprise (32 arènes = 64 agents) |
+| `Columns` | 0 | colonnes de la grille (0 = la plus carrée possible) |
+| `Auto Spacing` / `Margin` | coché / 2 | espacement = emprise de l'arène n°0 (colliders + rendus) + marge |
+| `Spacing` | (8, 6) | pas X/Z utilisé si l'espacement automatique est décoché |
+| `Render Copies` | décoché | copies invisibles : le GPU ne dessine que l'arène n°0 (physique et entraînement inchangés) |
+| `Show Copies UI` | décoché | seul le tableau de score de l'arène n°0 est affiché |
+| `Offset Spawn Seeds` | coché | avec une graine d'apparition positive, chaque copie reçoit une graine différente |
+
+À savoir :
+- **Les copies viennent du prefab.** *Préparer la scène* et *Revenir au mode jeu* appliquent automatiquement
+  leurs changements au prefab. Après toute autre modification de l'arène dans la scène, utiliser
+  **Entraînement parallèle > Appliquer les modifications de l'arène au prefab** (ou *Overrides > Apply All*) ;
+  sinon un avertissement apparaît au lancement de Play.
+- Les copies sont créées dans l'`Awake` de l'`ArenaReplicator` et nommées `Arena_00`, `Arena_01`...
+- `python train.py` accélère la simulation x10 par défaut (`--time-scale 1` pour regarder en temps réel).
+  Le coût CPU augmente avec N : surveiller les FPS, et masquer les copies si le rendu devient limitant.
+
+Vérification (Play réel en batchmode, dans une copie de test du projet ; pour tester aussi les vrais batchs
+et modèles, définir `IAFOOT_CHECK_PYTHON=1` et lancer avant `python train.py --resend-every 2`) :
+```powershell
+& 'C:\Program Files\Unity\Hub\Editor\6000.3.10f1\Editor\Unity.exe' -batchmode -nographics -projectPath . -executeMethod IAFoot.Editor.ArenaReplicatorChecks.RunPlayModeBatch -logFile arena-checks.log
+```
