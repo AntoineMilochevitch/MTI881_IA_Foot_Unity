@@ -36,7 +36,9 @@ namespace IAFoot.Editor
             FixedModeAndEpisodeEvents();
             TranslatedRotatedArena();
             SoloAndInactivePlayer();
-            Debug.Log("[IA Foot Tests] PASS : 7 vérifications des apparitions aléatoires.");
+            AroundBallLayouts();
+            AroundBallSeedsAndFailures();
+            Debug.Log("[IA Foot Tests] PASS : 9 vérifications des apparitions aléatoires (dont placement autour du ballon).");
         }
 
         // Unity -batchmode -nographics -projectPath ... -executeMethod IAFoot.Editor.RandomSpawnChecks.RunBatch
@@ -292,6 +294,126 @@ namespace IAFoot.Editor
                 f.match.RestartRound();
                 Require(f.players[1].transform.position == inactivePosition, "Joueur inactif déplacé");
                 Require((f.match.ball.Position - f.match.ballSpawn.position).sqrMagnitude > 1e-8f, "Solo non aléatoire");
+            }
+        }
+
+        static void AroundBallLayouts()
+        {
+            using (var f = new Fixture(2))
+            {
+                RoundSpawnRandomizer settings = f.match.randomSpawns;
+                settings.mode = RoundSpawnMode.AroundBall;
+                // Le tri gauche/droite doit suivre le terrain, pas les axes du monde.
+                f.root.transform.SetPositionAndRotation(new Vector3(1000f, 2f, 1000f), Quaternion.Euler(0f, 63f, 0f));
+                f.root.transform.localScale = new Vector3(1.2f, 1f, 0.9f);
+                var quadrants = new int[4];
+                int bothRightOfBall = 0, bothLeftOfBall = 0;
+                float smallestBallX = float.PositiveInfinity, largestBallX = float.NegativeInfinity;
+                for (int round = 0; round < 1000; round++)
+                {
+                    Require(settings.TryPlace(f.match), "AroundBall : placement valide introuvable");
+                    Vector3[] positions = f.Positions();
+                    Vector3 ball = f.root.transform.InverseTransformPoint(positions[0]);
+                    Vector3 blue = f.root.transform.InverseTransformPoint(positions[1]);
+                    Vector3 red = f.root.transform.InverseTransformPoint(positions[2]);
+                    Require(blue.x < red.x, "AroundBall : bleu à droite du rouge");
+                    quadrants[(ball.x >= 0 ? 1 : 0) + (ball.z >= 0 ? 2 : 0)]++;
+                    smallestBallX = Mathf.Min(smallestBallX, ball.x);
+                    largestBallX = Mathf.Max(largestBallX, ball.x);
+                    if (blue.x > ball.x) bothRightOfBall++;
+                    if (red.x < ball.x) bothLeftOfBall++;
+                    for (int i = 1; i < positions.Length; i++)
+                    {
+                        Vector2 range = settings.DistanceRange(f.match, f.players[i - 1].Team, positions[0]);
+                        float distance = Vector3.ProjectOnPlane(positions[i] - positions[0], f.root.transform.up).magnitude;
+                        Require(distance >= range.x - 0.001f && distance <= range.y + 0.001f,
+                            "AroundBall : distance hors de son intervalle");
+                        Vector3 local = f.root.transform.InverseTransformPoint(positions[i]);
+                        Require(Mathf.Abs(local.x) < 1.3f && Mathf.Abs(local.z) < 0.7f, "AroundBall : hors terrain");
+                    }
+                    for (int i = 0; i < positions.Length; i++)
+                        for (int j = 0; j < i; j++)
+                            Require(Vector3.ProjectOnPlane(positions[i] - positions[j], f.root.transform.up).magnitude >= 0.399f,
+                                "AroundBall : séparation non respectée");
+                }
+                Require(Array.TrueForAll(quadrants, count => count > 100), "AroundBall : ballon limité à une partie du terrain");
+                Require(smallestBallX < -1f && largestBallX > 1f, "AroundBall : ballon limité au centre");
+                Require(bothLeftOfBall > 10 && bothRightOfBall > 10, "AroundBall : ballon toujours entre les joueurs");
+
+                Vector3 left = f.root.transform.TransformPoint(new Vector3(-1f, 0f, 0f));
+                Vector3 right = f.root.transform.TransformPoint(new Vector3(1f, 0f, 0f));
+                Require(settings.DistanceRange(f.match, TeamId.Blue, left).y < settings.DistanceRange(f.match, TeamId.Blue, right).y,
+                    "AroundBall : proximité du but bleu ignorée");
+                Require(settings.DistanceRange(f.match, TeamId.Red, right).y < settings.DistanceRange(f.match, TeamId.Red, left).y,
+                    "AroundBall : proximité du but rouge ignorée");
+                // Une borne angulaire étroite doit aussi être respectée.
+                settings.angleDegrees = Vector2.zero;
+                for (int i = 0; i < 30; i++)
+                {
+                    Require(settings.TryPlace(f.match), "AroundBall : angle nul impossible");
+                    Vector3 ball = f.root.transform.InverseTransformPoint(f.match.ball.Position);
+                    foreach (PlayerController player in f.players)
+                    {
+                        Vector3 local = f.root.transform.InverseTransformPoint(player.Position);
+                        Require(Mathf.Abs(local.z - ball.z) < 0.001f, "AroundBall : angle ignoré");
+                        Require((local.x - ball.x) * player.Team.AttackSign() < 0f, "AroundBall : angle vers le mauvais camp");
+                    }
+                }
+            }
+        }
+
+        static void AroundBallSeedsAndFailures()
+        {
+            Vector3[][] expected = new Vector3[10][];
+            using (var f = new Fixture(2))
+            {
+                f.match.randomSpawns.mode = RoundSpawnMode.AroundBall;
+                for (int i = 0; i < expected.Length; i++)
+                {
+                    Require(f.match.randomSpawns.TryPlace(f.match), "AroundBall : premier tirage impossible");
+                    expected[i] = f.Positions();
+                }
+            }
+            using (var f = new Fixture(2))
+            {
+                var settings = f.match.randomSpawns;
+                settings.mode = RoundSpawnMode.AroundBall;
+                for (int i = 0; i < expected.Length; i++)
+                {
+                    UnityEngine.Random.InitState(91 * i);
+                    Require(settings.TryPlace(f.match), "AroundBall : second tirage impossible");
+                    EqualPositions(expected[i], f.Positions());
+                }
+                Vector3[] before = f.Positions();
+                settings.nearGoalDistance = new Vector2(float.NaN, 0.5f);
+                Require(!settings.TryPlace(f.match), "AroundBall : NaN accepté");
+                EqualPositions(before, f.Positions());
+                settings.nearGoalDistance = settings.farGoalDistance = new Vector2(0.01f, 0.02f);
+                Require(!settings.TryPlace(f.match), "AroundBall : chevauchement accepté");
+                EqualPositions(before, f.Positions());
+                settings.nearGoalDistance = new Vector2(0.4f, 0.55f);
+                settings.farGoalDistance = new Vector2(0.55f, 0.8f);
+                BoxCollider wall = f.Box("Obstacle", new Vector3(0f, 0.5f, 0f), new Vector3(0.2f, 1f, 0.3f));
+                BoxCollider goal = f.Box("Goal", new Vector3(0.9f, 0.3f, 0f), new Vector3(0.3f, 0.6f, 0.3f));
+                goal.isTrigger = true;
+                goal.gameObject.AddComponent<GoalZone>();
+                for (int i = 0; i < 100; i++)
+                {
+                    Require(settings.TryPlace(f.match), "AroundBall : obstacle non contourné");
+                    foreach (Collider body in f.DynamicColliders())
+                        foreach (Collider obstacle in new Collider[] { wall, goal })
+                            Require(!Physics.ComputePenetration(body, body.transform.position, body.transform.rotation,
+                                obstacle, obstacle.transform.position, obstacle.transform.rotation, out _, out _),
+                                "AroundBall : pénétration d'un obstacle ou d'un but");
+                }
+                f.floor.enabled = false;
+                before = f.Positions();
+                Require(!settings.TryPlace(f.match), "AroundBall : absence de sol ignorée");
+                EqualPositions(before, f.Positions());
+                f.floor.enabled = true;
+                f.players[1].gameObject.SetActive(false);
+                Require(settings.TryPlace(f.match), "AroundBall : solo impossible");
+                Require(f.players[1].Position == before[2], "AroundBall : joueur inactif déplacé");
             }
         }
 

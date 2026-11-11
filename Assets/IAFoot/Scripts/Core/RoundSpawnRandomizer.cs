@@ -4,6 +4,12 @@ using UnityEngine;
 
 namespace IAFoot
 {
+    public enum RoundSpawnMode
+    {
+        Free = 0,
+        AroundBall = 1,
+    }
+
     /// <summary>Tire un placement complet avant de déplacer le moindre objet.</summary>
     [Serializable]
     public sealed class RoundSpawnRandomizer
@@ -20,6 +26,16 @@ namespace IAFoot
         [Min(0f)] public float clearance = 0.05f;
         [Tooltip("0 : nouvelle séquence à chaque lancement. Une valeur positive reproduit la séquence des placements.")]
         [Min(0)] public int seed;
+
+        [Header("Placement autour du ballon")]
+        [Tooltip("Free : positions indépendantes. Around Ball : distances liées au but défendu et bleu à gauche du rouge.")]
+        public RoundSpawnMode mode = RoundSpawnMode.Free;
+        [Tooltip("Intervalle joueur-ballon près du but défendu, en unités monde. Minimum Distance reste prioritaire.")]
+        public Vector2 nearGoalDistance = new Vector2(0.4f, 0.55f);
+        [Tooltip("Intervalle joueur-ballon loin du but défendu, en unités monde.")]
+        public Vector2 farGoalDistance = new Vector2(0.55f, 0.8f);
+        [Tooltip("Angle autour du ballon en degrés : 0 vers son camp, +/-180 vers le camp adverse. [-180,180] autorise tout le cercle.")]
+        public Vector2 angleDegrees = new Vector2(-180f, 180f);
 
         [NonSerialized] System.Random random;
         [NonSerialized] int currentSeed;
@@ -42,6 +58,14 @@ namespace IAFoot
                 || !Valid(areaSize.x) || !Valid(areaSize.y) || areaSize.x <= 0f || areaSize.y <= 0f
                 || !Valid(minimumDistance) || minimumDistance < 0f
                 || !Valid(clearance) || clearance < 0f)
+                return false;
+            if (mode != RoundSpawnMode.Free && mode != RoundSpawnMode.AroundBall)
+                return false;
+            if (mode == RoundSpawnMode.AroundBall &&
+                (!match.ball || !match.ball.isActiveAndEnabled || !ValidInterval(nearGoalDistance)
+                 || !ValidInterval(farGoalDistance) || nearGoalDistance.x <= 0f
+                 || farGoalDistance.x < nearGoalDistance.x || farGoalDistance.y < nearGoalDistance.y
+                 || !ValidInterval(angleDegrees) || angleDegrees.y - angleDegrees.x > 360f))
                 return false;
 
             Transform arena = match.transform;
@@ -74,6 +98,14 @@ namespace IAFoot
                 bool complete = true;
                 for (int i = 0; i < bodies.Count; i++)
                 {
+                    // Le ballon (index 0) garde le même tirage sur toute la zone.
+                    // Tous les joueurs sont ensuite proposés ensemble : aucun côté
+                    // n'est placé en premier au détriment de l'autre.
+                    if (mode == RoundSpawnMode.AroundBall && i == 1)
+                    {
+                        complete = TryPlayersAroundBall(match, positions, bodies, movingColliders, scaleX, scaleZ);
+                        break;
+                    }
                     Body body = bodies[i];
                     float halfX = areaSize.x * 0.5f - (body.radius + clearance) / scaleX;
                     float halfZ = areaSize.y * 0.5f - (body.radius + clearance) / scaleZ;
@@ -118,6 +150,100 @@ namespace IAFoot
             }
             return false;
         }
+
+        /// <summary>
+        /// Interpole les deux bornes selon la distance horizontale ballon-but défendu,
+        /// divisée par la distance entre les buts (bornée à 1). C'est l'intervalle
+        /// qui se rapproche du ballon, pas une égalité imposée entre deux tirages.
+        /// Les vrais buts de CE match sont utilisés, même sur une arène déplacée.
+        /// Sans GoalZone (scène minimale), les deux extrémités de la zone servent de référence.
+        /// </summary>
+        public Vector2 DistanceRange(MatchManager match, TeamId team, Vector3 ballPosition)
+        {
+            Vector3 own = GoalPosition(match, team);
+            Vector3 other = GoalPosition(match, team.Opponent());
+            float length = Vector3.ProjectOnPlane(other - own, match.transform.up).magnitude;
+            float distance = Vector3.ProjectOnPlane(ballPosition - own, match.transform.up).magnitude;
+            float fraction = Mathf.Clamp01(distance / Mathf.Max(length, 1e-5f));
+            return Vector2.Lerp(nearGoalDistance, farGoalDistance, fraction);
+        }
+
+        Vector3 GoalPosition(MatchManager match, TeamId team)
+        {
+            GoalZone goal = match.GetGoalDefendedBy(team);
+            return goal ? goal.Center : match.transform.TransformPoint(new Vector3(
+                areaCenter.x - team.AttackSign() * areaSize.x * 0.5f, 0f, areaCenter.y));
+        }
+
+        bool TryPlayersAroundBall(MatchManager match, Vector3[] positions, List<Body> bodies,
+            HashSet<Collider> movingColliders, float scaleX, float scaleZ)
+        {
+            Transform arena = match.transform;
+            Vector3 ballLocal = arena.InverseTransformPoint(positions[0]);
+            var ranges = new Vector2[bodies.Count];
+            for (int i = 1; i < bodies.Count; i++)
+            {
+                ranges[i] = DistanceRange(match, bodies[i].player.Team, positions[0]);
+                // Une limite physique n'est jamais contournée par une distance tirée trop petite.
+                ranges[i].x = Mathf.Max(ranges[i].x, minimumDistance,
+                    bodies[0].radius + bodies[i].radius + clearance);
+                if (ranges[i].x > ranges[i].y || bodies[i].colliders.Length == 0)
+                    return false;
+            }
+
+            // Nombre d'essais borné : des réglages impossibles rendent la main au
+            // MatchManager, qui conserve le placement fixe et affiche un avertissement.
+            for (int attempt = 0; attempt < 256; attempt++)
+            {
+                bool valid = true;
+                float rightmostBlue = float.NegativeInfinity;
+                float leftmostRed = float.PositiveInfinity;
+                for (int i = 1; i < bodies.Count; i++)
+                {
+                    Body body = bodies[i];
+                    float radius = Sample(ranges[i]);
+                    float angle = Sample(angleDegrees) * Mathf.Deg2Rad;
+                    // Rotation de 180 degrés pour Red : mêmes règles dans les deux camps.
+                    float side = -body.player.Team.AttackSign();
+                    Vector3 local = new Vector3(
+                        ballLocal.x + side * radius * Mathf.Cos(angle) / scaleX,
+                        arena.InverseTransformPoint(body.root.position).y,
+                        ballLocal.z + side * radius * Mathf.Sin(angle) / scaleZ);
+                    positions[i] = arena.TransformPoint(local);
+                    float halfX = areaSize.x * 0.5f - (body.radius + clearance) / scaleX;
+                    float halfZ = areaSize.y * 0.5f - (body.radius + clearance) / scaleZ;
+                    if (halfX <= 0f || halfZ <= 0f
+                        || Mathf.Abs(local.x - areaCenter.x) > halfX
+                        || Mathf.Abs(local.z - areaCenter.y) > halfZ
+                        || !Separated(positions[i], i, positions, bodies, arena.up))
+                    {
+                        valid = false;
+                        break;
+                    }
+                    if (body.player.Team == TeamId.Blue)
+                        rightmostBlue = Mathf.Max(rightmostBlue, local.x);
+                    else
+                        leftmostRed = Mathf.Min(leftmostRed, local.x);
+                }
+                // Le ballon peut être à gauche, entre les joueurs, ou à droite.
+                // On rejette une proposition, on ne la rabat jamais sur une bordure.
+                if (!valid || rightmostBlue >= leftmostRed)
+                    continue;
+                for (int i = 1; i < bodies.Count; i++)
+                    if (!HasGround(positions[i], arena.up, movingColliders)
+                        || !ClearOfObstacles(bodies[i], positions[i], movingColliders))
+                    {
+                        valid = false;
+                        break;
+                    }
+                if (valid)
+                    return true;
+            }
+            return false;
+        }
+
+        float Sample(Vector2 range) => Mathf.Lerp(range.x, range.y, (float)random.NextDouble());
+        static bool ValidInterval(Vector2 range) => Valid(range.x) && Valid(range.y) && range.x <= range.y;
 
         float SignedSample() => (float)(random.NextDouble() * 2.0 - 1.0);
         static bool Valid(float value) => !float.IsNaN(value) && !float.IsInfinity(value);

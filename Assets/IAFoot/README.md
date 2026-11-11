@@ -25,6 +25,32 @@ d'un agent, sortie du ballon ou appel à `RestartRound`.
 Les positions sont tirées dans toute la zone, sans réserver une moitié à chaque équipe.
 La zone initiale reste à l'intérieur du terrain de démonstration, à distance des cages.
 Pour un autre terrain, ajuster son centre et ses dimensions dans l'Inspector.
+
+### Placement autour du ballon
+
+`Mode = Around Ball` conserve le ballon aléatoire dans toute la zone jouable et tire les joueurs
+autour de lui. Le bleu commence à gauche du rouge dans le repère **local du terrain** ; le ballon
+peut être entre eux ou du même côté des deux joueurs. Ce réglage est activé dans la scène Demo
+et le prefab Arena. `Mode = Free` retrouve les positions indépendantes précédentes.
+
+| Réglage | Valeur initiale | Sens |
+| --- | --- | --- |
+| `Near Goal Distance` | `(0.4, 0.55)` | intervalle joueur–ballon près de son propre but |
+| `Far Goal Distance` | `(0.55, 0.8)` | intervalle joueur–ballon loin de son propre but |
+| `Angle Degrees` | `(-180, 180)` | cercle complet ; `0` pointe vers son camp |
+
+Les distances sont horizontales, en unités monde. Les deux bornes sont interpolées selon la distance
+ballon–but défendu, divisée par la distance entre les buts et bornée à 1. Le joueur près de son but
+est donc placé plus près **en moyenne**, pas nécessairement plus près que son adversaire à chaque tirage.
+`Minimum Distance` et la taille des colliders imposent toujours une séparation minimale.
+
+On tire le ballon, puis une configuration entière de joueurs. Une configuration hors terrain,
+inversant bleu/rouge ou heurtant un obstacle est rejetée, sans rabattre les positions contre les murs.
+Si les essais échouent, une nouvelle position du ballon est tirée ; après un nombre borné de tentatives, les points fixes
+servent de repli avec un avertissement. Les contraintes peuvent donc biaiser la distribution près des
+bordures ; ce n'est pas un tirage uniforme de toutes les configurations possibles.
+Les orientations initiales restent dirigées vers le but adverse. Le mode fonctionne aussi en solo.
+
 Les hauteurs des points fixes sont conservées, les joueurs regardent vers leur but adverse,
 et les vitesses et états de jeu sont réinitialisés comme lors d'un coup d'envoi habituel.
 
@@ -111,9 +137,9 @@ Mise en route :
 - **Entraînement parallèle** : voir ci-dessous (N arènes à partir d'un prefab, un seul `TrainingBridge`).
 
 ## Entraînement parallèle (N arènes)
-L'arène est enregistrée en prefab, puis dupliquée N fois au lancement. Chaque copie est un match
+L'arène est dupliquée N fois au lancement. Chaque copie est un match
 indépendant, mais tous les agents parlent au même `TrainingBridge` :
-- les transitions des N arènes remplissent **le même batch** (un batch de 1024 se remplit N fois plus vite) ;
+- les transitions des N arènes remplissent **le même batch** (le gain réel dépend du coût de simulation) ;
 - chaque modèle reçu de Python est installé **en une fois sur les agents de toutes les arènes**.
 
 Rien ne change côté Python : les trajectoires restent séparées par `agent_id` / `episode_id`, uniques
@@ -128,7 +154,8 @@ Mise en route (après **Préparer la scène**) :
 
 | Réglage (`ArenaReplicator`) | Défaut | Effet |
 |---|---|---|
-| `Arena Prefab` / `Scene Arena` | remplis par le menu | prefab dupliqué ; arène de la scène (n°0, origine de la grille) |
+| `Arena Prefab` / `Scene Arena` | remplis par le menu | prefab de secours ; arène de la scène (n°0, origine de la grille) |
+| `Clone Scene Arena` | coché | copie les réglages de l'arène de scène, y compris ses modifications non appliquées au prefab ; décoché = copies du prefab |
 | `Arena Count` | 32 | nombre total d'arènes, celle de la scène comprise (32 arènes = 64 agents) |
 | `Columns` | 0 | colonnes de la grille (0 = la plus carrée possible) |
 | `Auto Spacing` / `Margin` | coché / 2 | espacement = emprise de l'arène n°0 (colliders + rendus) + marge |
@@ -138,10 +165,12 @@ Mise en route (après **Préparer la scène**) :
 | `Offset Spawn Seeds` | coché | avec une graine d'apparition positive, chaque copie reçoit une graine différente |
 
 À savoir :
-- **Les copies viennent du prefab.** *Préparer la scène* et *Revenir au mode jeu* appliquent automatiquement
-  leurs changements au prefab. Après toute autre modification de l'arène dans la scène, utiliser
-  **Entraînement parallèle > Appliquer les modifications de l'arène au prefab** (ou *Overrides > Apply All*) ;
-  sinon un avertissement apparaît au lancement de Play.
+- **Par défaut, les copies viennent de l'arène de la scène**, avant le démarrage des matchs. Un changement
+  de comportement, de bot, de récompenses ou d'apparitions concerne donc toutes les copies. Le prefab sert
+  quand aucune arène de scène n'est indiquée. Avec `Clone Scene Arena` décoché, appliquer les changements
+  au prefab via **Entraînement parallèle > Appliquer les modifications de l'arène au prefab** ; sinon
+  un avertissement signale les divergences. Les références aux joueurs, ballon et buts doivent rester
+  internes à l'arène.
 - Les copies sont créées dans l'`Awake` de l'`ArenaReplicator` et nommées `Arena_00`, `Arena_01`...
 - `python train.py` accélère la simulation x10 par défaut (`--time-scale 1` pour regarder en temps réel).
   Le coût CPU augmente avec N : surveiller les FPS, et masquer les copies si le rendu devient limitant.
@@ -151,3 +180,9 @@ et modèles, définir `IAFOOT_CHECK_PYTHON=1` et lancer avant `python train.py -
 ```powershell
 & 'C:\Program Files\Unity\Hub\Editor\6000.3.10f1\Editor\Unity.exe' -batchmode -nographics -projectPath . -executeMethod IAFoot.Editor.ArenaReplicatorChecks.RunPlayModeBatch -logFile arena-checks.log
 ```
+
+`IAFOOT_CHECK_ARENAS=32` teste 32 terrains. `IAFOOT_CHECK_SNAPSHOT=1` teste deux comportements :
+`Foot` enregistre, `FootSnapshot` joue sans enregistrer. Le prefab de test reste volontairement en
+self-play pour vérifier que les copies suivent bien les réglages de la scène. `IAFOOT_CHECK_PORT`
+permet d'utiliser un serveur de test distinct. Les tests vérifient aussi qu'un reset n'affecte pas
+un autre terrain. Le serveur utilisé dans ce cas doit charger les deux politiques.

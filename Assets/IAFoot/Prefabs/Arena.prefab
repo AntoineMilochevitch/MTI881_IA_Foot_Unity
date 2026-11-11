@@ -1580,6 +1580,10 @@ MonoBehaviour:
     minimumDistance: 0.4
     clearance: 0.05
     seed: 0
+    mode: 1
+    nearGoalDistance: {x: 0.4, y: 0.55}
+    farGoalDistance: {x: 0.55, y: 0.8}
+    angleDegrees: {x: -180, y: 180}
   startOnPlay: 1
   kickoffFreezeDuration: 0
   goalCelebrationDuration: 0

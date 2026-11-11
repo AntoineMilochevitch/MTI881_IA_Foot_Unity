@@ -4,7 +4,7 @@ using UnityEngine;
 namespace IAFoot
 {
     /// <summary>
-    /// Duplique le prefab de l'arène N fois au lancement, en grille, pour accélérer l'entraînement.
+    /// Duplique l'arène de scène (ou son prefab) N fois au lancement, en grille, pour accélérer l'entraînement.
     ///
     /// Chaque copie est un match indépendant (son MatchManager, son ballon, ses joueurs, ses épisodes).
     /// Tous les FootAgent de la scène s'inscrivent auprès du même TrainingBridge : les transitions des N
@@ -20,6 +20,9 @@ namespace IAFoot
         [Tooltip("Arène déjà présente dans la scène : elle compte comme la n°0 et sert d'origine à la grille. " +
                  "Vide = toutes les arènes sont créées à partir de la position de cet objet.")]
         [SerializeField] MatchManager sceneArena;
+        [Tooltip("Duplique l'arène de la scène avec ses réglages actuels (comportements, adversaire, récompenses, apparitions). " +
+                 "Décocher pour dupliquer strictement Arena Prefab.")]
+        [SerializeField] bool cloneSceneArena = true;
 
         [Header("Duplication")]
         [Tooltip("Nombre total d'arènes qui jouent en parallèle (arène de la scène comprise).")]
@@ -57,6 +60,7 @@ namespace IAFoot
 
         public GameObject ArenaPrefab => arenaPrefab;
         public MatchManager SceneArena => sceneArena;
+        public bool ClonesSceneArena => cloneSceneArena && sceneArena;
 
         public static int AutoColumns(int count) => Mathf.Max(1, Mathf.CeilToInt(Mathf.Sqrt(count)));
 
@@ -66,7 +70,11 @@ namespace IAFoot
 
         void Awake()
         {
-            GameObject source = arenaPrefab ? arenaPrefab : sceneArena ? sceneArena.gameObject : null;
+            // Awake (-100) précède celui des matchs : la scène est encore une
+            // configuration initiale. Instantiate remappe les références internes
+            // vers les joueurs/buts/ballon de chaque copie, sans état de partie partagé.
+            GameObject source = ClonesSceneArena ? sceneArena.gameObject
+                : arenaPrefab ? arenaPrefab : sceneArena ? sceneArena.gameObject : null;
             if (!source)
             {
                 Debug.LogError("[IA Foot] ArenaReplicator : aucun prefab d'arène ni arène de scène à dupliquer.", this);

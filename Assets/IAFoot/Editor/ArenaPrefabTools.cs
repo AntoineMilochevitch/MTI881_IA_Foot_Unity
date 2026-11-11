@@ -24,6 +24,8 @@ namespace IAFoot.EditorTools
                 return;
             foreach (ArenaReplicator replicator in Object.FindObjectsByType<ArenaReplicator>(FindObjectsSortMode.None))
             {
+                if (replicator.ClonesSceneArena)
+                    continue;
                 GameObject prefab = replicator.ArenaPrefab;
                 MatchManager arena = replicator.SceneArena;
                 if (!prefab || !arena)

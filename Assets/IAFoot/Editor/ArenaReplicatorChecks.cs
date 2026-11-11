@@ -47,6 +47,8 @@ namespace IAFoot.Editor
         }
 
         static bool WithPython => Environment.GetEnvironmentVariable("IAFOOT_CHECK_PYTHON") == "1";
+        // Exerce la scène comme source, avec un prefab volontairement resté en self-play.
+        static bool WithSnapshot => Environment.GetEnvironmentVariable("IAFOOT_CHECK_SNAPSHOT") == "1";
 
         public static void RunPlayModeBatch()
         {
@@ -61,14 +63,28 @@ namespace IAFoot.Editor
 
                 GameObject arena = BuildArena();
                 GameObject prefab = PrefabUtility.SaveAsPrefabAsset(arena, TempFolder + "/CheckArena.prefab");
-                Object.DestroyImmediate(arena);
+                MatchManager sceneArena = null;
+                if (WithSnapshot)
+                {
+                    sceneArena = arena.GetComponent<MatchManager>();
+                    sceneArena.randomSpawns.mode = RoundSpawnMode.AroundBall;
+                    FootAgent opponent = sceneArena.teams[1].players[0].GetComponent<FootAgent>();
+                    var opponentSettings = new SerializedObject(opponent);
+                    opponentSettings.FindProperty("behaviorName").stringValue = "FootSnapshot";
+                    opponentSettings.FindProperty("recordExperience").boolValue = false;
+                    opponentSettings.ApplyModifiedPropertiesWithoutUndo();
+                }
+                else
+                    Object.DestroyImmediate(arena);
 
                 var replicator = new GameObject("ArenaReplicator").AddComponent<ArenaReplicator>();
-                replicator.Configure(prefab, null, ArenaCount);
+                replicator.Configure(prefab, sceneArena, ArenaCount);
 
                 var bridge = new GameObject("TrainingBridge").AddComponent<TrainingBridge>();
                 var settings = new SerializedObject(bridge);
                 settings.FindProperty("connectOnStart").boolValue = WithPython;
+                if (int.TryParse(Environment.GetEnvironmentVariable("IAFOOT_CHECK_PORT"), out int port))
+                    settings.FindProperty("port").intValue = port;
                 // Plusieurs décisions par batch, pour que le batch en cours contienne toujours des transitions à inspecter.
                 settings.FindProperty("batchSize").intValue = WithPython ? Mathf.Max(64, ArenaCount * PlayersPerArena * 4) : 100000;
                 settings.FindProperty("showOverlay").boolValue = false;
@@ -148,7 +164,8 @@ namespace IAFoot.Editor
                     return;
 
                 FootAgent[] agents = Object.FindObjectsByType<FootAgent>(FindObjectsSortMode.InstanceID);
-                var channel = (BehaviorChannel)AgentChannel.GetValue(agents[0]);
+                var channel = (BehaviorChannel)AgentChannel.GetValue(agents.First(a => a.TeamName == "Blue"));
+                BehaviorChannel[] channels = agents.Select(a => (BehaviorChannel)AgentChannel.GetValue(a)).Distinct().ToArray();
                 if (!structureChecked)
                 {
                     CheckStructure(agents, channel);
@@ -156,7 +173,8 @@ namespace IAFoot.Editor
                     startPositions = agents.ToDictionary(a => a, a => a.transform.position);
                     phaseStart = Time.time;
                     if (!WithPython)
-                        ChannelPolicy.SetValue(channel, VersionedPolicy(channel, 42));
+                        foreach (BehaviorChannel item in channels)
+                            ChannelPolicy.SetValue(item, VersionedPolicy(item, 42));
                 }
 
                 // Le batch en cours doit mélanger les transitions de toutes les arènes.
@@ -166,7 +184,7 @@ namespace IAFoot.Editor
 
                 int batchesSent = (int)ChannelBatches.GetValue(channel);
                 int version = channel.Policy.Version;
-                bool ready = WithPython ? batchesSent >= 4 && version >= 2 : Time.time - phaseStart > 2f;
+                bool ready = WithPython ? batchesSent >= (WithSnapshot ? 10 : 4) && version >= 2 : Time.time - phaseStart > 2f;
                 if (!ready)
                     return;
 
@@ -174,15 +192,24 @@ namespace IAFoot.Editor
                     $"Batch : transitions de {maxArenasInOneBatch} arène(s) seulement, {ArenaCount} attendues.");
                 foreach (FootAgent agent in agents)
                 {
-                    Require(agent.ModelVersion == version, $"Modèle : {agent.name} ({agent.ArenaName}) en v{agent.ModelVersion}, canal en v{version}.");
-                    Require(!WithPython || version >= 2, "Modèle : aucune mise à jour reçue de Python.");
-                    Require(WithPython || version == 42, "Modèle : la politique installée n'est pas lue par les agents.");
+                    var ownChannel = (BehaviorChannel)AgentChannel.GetValue(agent);
+                    int ownVersion = ownChannel.Policy.Version;
+                    Require(agent.ModelVersion == ownVersion, "Modèle : agent désynchronisé de son comportement");
+                    Require(!WithPython || ownVersion >= 1, "Modèle : aucune politique reçue de Python.");
+                    Require(WithPython || ownVersion == 42, "Modèle : la politique installée n'est pas lue par les agents.");
+                    if (WithSnapshot && agent.TeamName == "Red")
+                    {
+                        Require(((IList<int>)BufferAgentIds.GetValue(ChannelBuffer.GetValue(ownChannel))).Count == 0,
+                            "Snapshot : l'adversaire enregistre des transitions");
+                        Require((int)ChannelBatches.GetValue(ownChannel) == 0, "Snapshot : batch adverse envoyé");
+                    }
                 }
                 int moved = agents.Count(a => Vector3.ProjectOnPlane(a.transform.position - startPositions[a], Vector3.up).magnitude > 0.01f);
                 Require(moved >= agents.Length - 1, $"Simulation : seuls {moved}/{agents.Length} joueurs ont bougé.");
 
-                Debug.Log($"[IA Foot Tests] PASS : {ArenaCount} arènes dupliquées depuis le prefab, sans chevauchement, " +
-                          $"{agents.Length} agents dans un seul canal, batchs mélangeant les {ArenaCount} arènes" +
+                CheckResetIsolation();
+                Debug.Log($"[IA Foot Tests] PASS : {ArenaCount} arènes indépendantes, sans chevauchement, " +
+                          $"{agents.Length} agents, {channels.Length} comportement(s), batchs mélangeant les {ArenaCount} arènes" +
                           (WithPython ? $", {batchesSent} batchs envoyés à Python, modèle v{version} reçu et installé partout."
                                       : ", modèle v42 installé sur tous les agents."));
                 Finish(null);
@@ -211,10 +238,43 @@ namespace IAFoot.Editor
                     Require(!footprints[i].Intersects(footprints[j]), $"Grille : {matches[i].name} et {matches[j].name} se chevauchent.");
 
             Require(agents.Length == ArenaCount * PlayersPerArena, $"Agents : {agents.Length} trouvés.");
-            Require(channel != null && agents.All(a => AgentChannel.GetValue(a) == channel), "Agents : plusieurs canaux d'enregistrement.");
+            Require(channel != null, "Agents : canal absent.");
+            if (WithSnapshot)
+            {
+                Require(agents.Select(a => AgentChannel.GetValue(a)).Distinct().Count() == 2, "Snapshot : deux comportements attendus");
+                Require(agents.Where(a => a.TeamName == "Blue").All(a => AgentChannel.GetValue(a) == channel), "Snapshot : canal bleu incorrect");
+                Require(agents.Where(a => a.TeamName == "Red").All(a => AgentChannel.GetValue(a) != channel), "Snapshot : rouge sur canal apprenant");
+                Require(matches.All(m => m.randomSpawns.mode == RoundSpawnMode.AroundBall), "Copies : réglages de scène ignorés");
+                foreach (MatchManager m in matches)
+                {
+                    // Refaire un reset permet de vérifier les positions initiales, avant les déplacements.
+                    m.RestartRound();
+                    float blueX = m.transform.InverseTransformPoint(m.GetTeam(TeamId.Blue).players[0].Position).x;
+                    float redX = m.transform.InverseTransformPoint(m.GetTeam(TeamId.Red).players[0].Position).x;
+                    Require(blueX < redX, "Copies : ordre bleu/rouge incorrect");
+                }
+            }
+            else
+                Require(agents.All(a => AgentChannel.GetValue(a) == channel), "Agents : plusieurs canaux d'enregistrement.");
             Require(agents.Select(a => a.AgentId).Distinct().Count() == agents.Length, "Agents : identifiants en double.");
             Require(agents.Select(a => a.ArenaName).Distinct().Count() == ArenaCount, "Agents : nom d'arène manquant.");
             Require(agents.All(a => a.EpisodeActive), "Agents : épisode inactif.");
+        }
+
+        static void CheckResetIsolation()
+        {
+            var matches = Object.FindFirstObjectByType<ArenaReplicator>().Arenas;
+            if (matches.Count < 2) return;
+            MatchManager other = matches[1];
+            Vector3 ball = other.Ball.Position;
+            Vector3[] players = other.AllPlayers.Select(p => p.Position).ToArray();
+            float time = other.RoundTime;
+            int roundEvents = 0;
+            other.RoundStarted += () => roundEvents++;
+            matches[0].RestartRound();
+            Require(other.Ball.Position == ball && other.RoundTime == time && roundEvents == 0,
+                "Isolation : reset transmis à une autre arène");
+            Require(other.AllPlayers.Select(p => p.Position).SequenceEqual(players), "Isolation : joueurs étrangers déplacés");
         }
 
         static Bounds WorldBounds(Transform root)
