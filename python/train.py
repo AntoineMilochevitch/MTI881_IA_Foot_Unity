@@ -12,7 +12,7 @@ Exemples :
     python train.py --model tree            # arbre de décision + actions discrètes
     python train.py --model none            # n'envoie rien : les agents restent en exploration aléatoire
     python train.py --resend-every 5        # nouveau modèle tous les 5 batchs (test du remplacement à chaud)
-    python train.py --time-scale 10         # accélère la simulation Unity
+    python train.py --time-scale 1          # temps réel (par défaut la simulation Unity est accélérée x10)
 """
 
 from __future__ import annotations
@@ -102,7 +102,8 @@ class DebugTrainer:
 
         for behavior in connection.behaviors:
             actions = ", ".join(f"{a['name']} ({a['type']})" for a in behavior["actions"])
-            agents = ", ".join(f"#{a['id']} {a['name']} [{a['team']}]" for a in behavior["agents"])
+            agents = ", ".join(f"#{a['id']} {a['arena'] + '/' if a.get('arena') else ''}{a['name']} [{a['team']}]"
+                               for a in behavior["agents"])
             print(f"  Comportement '{behavior['name']}' :")
             print(f"    observations : {behavior['obs_size']} valeurs")
             if self.args.verbose:
@@ -111,6 +112,9 @@ class DebugTrainer:
             print(f"    actions      : {behavior['action_size']} valeurs -> {actions}")
             print(f"    décision     : tous les {behavior['decision_period']} pas de physique")
             print(f"    agents       : {agents or 'aucun'}")
+            arenas = {a.get("arena") for a in behavior["agents"] if a.get("arena")}
+            if len(arenas) > 1:
+                print(f"    arènes       : {len(arenas)} en parallèle (transitions regroupées dans les mêmes batchs)")
             print(f"    modèle actuel: v{behavior['model_version']} (0 = exploration aléatoire)")
 
         if self.args.time_scale is not None or self.args.batch_size is not None:
@@ -220,7 +224,8 @@ def main() -> None:
     parser.add_argument("--resend-every", type=int, default=0, metavar="N",
                         help="renvoie un nouveau modèle tous les N batchs (0 = jamais)")
     parser.add_argument("--deterministic", action="store_true", help="désactive l'exploration côté Unity")
-    parser.add_argument("--time-scale", type=float, default=None, help="vitesse de simulation à imposer à Unity")
+    parser.add_argument("--time-scale", type=float, default=10.0,
+                        help="vitesse de simulation imposée à Unity (défaut 10 ; 1 = temps réel pour regarder les matchs)")
     parser.add_argument("--batch-size", type=int, default=None, help="seuil d'envoi des batchs à imposer à Unity")
     parser.add_argument("--show", type=int, default=2, metavar="K", help="nombre de transitions détaillées par batch")
     parser.add_argument("--verbose", action="store_true", help="affiche aussi le nom de chaque observation")

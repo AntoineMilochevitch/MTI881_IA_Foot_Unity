@@ -39,6 +39,7 @@ namespace IAFoot.EditorTools
 
             // Pas de temps mort entre deux épisodes pendant l'entraînement.
             SetMatchTimings(0f, 0f, 0f);
+            SyncArenaPrefabs();
 
             MarkDirty(bridge.gameObject);
             Selection.activeGameObject = bridge.gameObject;
@@ -64,6 +65,7 @@ namespace IAFoot.EditorTools
             }
 
             SetMatchTimings(1f, 2.5f, 4f);
+            SyncArenaPrefabs();
             Debug.Log("[IA Foot] Scène revenue au mode jeu.");
         }
 
@@ -78,6 +80,13 @@ namespace IAFoot.EditorTools
                 EditorUtility.SetDirty(match);
                 MarkDirty(match.gameObject);
             }
+        }
+
+        /// <summary>Les copies de l'ArenaReplicator viennent du prefab : il doit suivre la configuration de l'arène de la scène.</summary>
+        static void SyncArenaPrefabs()
+        {
+            foreach (MatchManager match in Object.FindObjectsByType<MatchManager>(FindObjectsSortMode.None))
+                ArenaPrefabTools.SyncPrefab(match);
         }
 
         static void SetBrainEnabled(Behaviour brain, bool enabled)
