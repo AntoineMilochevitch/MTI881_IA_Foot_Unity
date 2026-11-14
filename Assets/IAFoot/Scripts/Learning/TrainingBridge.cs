@@ -410,6 +410,9 @@ namespace IAFoot.Learning
                         ["name"] = agent.name,
                         ["team"] = agent.TeamName,
                         ["arena"] = agent.ArenaName,
+                        // Métadonnées facultatives, sans changer les tenseurs du protocole.
+                        ["opponent_group"] = agent.OpponentGroup,
+                        ["record_experience"] = agent.RecordsExperience,
                     });
                 }
 

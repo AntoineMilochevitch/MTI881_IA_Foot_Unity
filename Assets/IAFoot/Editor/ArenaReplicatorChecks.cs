@@ -48,6 +48,7 @@ namespace IAFoot.Editor
 
         static bool WithPython => Environment.GetEnvironmentVariable("IAFOOT_CHECK_PYTHON") == "1";
         // Exerce la scène comme source, avec un prefab volontairement resté en self-play.
+        static bool WithMix => Environment.GetEnvironmentVariable("IAFOOT_CHECK_MIX") == "1";
         static bool WithSnapshot => Environment.GetEnvironmentVariable("IAFOOT_CHECK_SNAPSHOT") == "1";
 
         public static void RunPlayModeBatch()
@@ -64,7 +65,7 @@ namespace IAFoot.Editor
                 GameObject arena = BuildArena();
                 GameObject prefab = PrefabUtility.SaveAsPrefabAsset(arena, TempFolder + "/CheckArena.prefab");
                 MatchManager sceneArena = null;
-                if (WithSnapshot)
+                if (WithSnapshot || WithMix)
                 {
                     sceneArena = arena.GetComponent<MatchManager>();
                     sceneArena.randomSpawns.mode = RoundSpawnMode.AroundBall;
@@ -79,6 +80,7 @@ namespace IAFoot.Editor
 
                 var replicator = new GameObject("ArenaReplicator").AddComponent<ArenaReplicator>();
                 replicator.Configure(prefab, sceneArena, ArenaCount);
+                if (WithMix) replicator.gameObject.AddComponent<ArenaOpponentMix>();
 
                 var bridge = new GameObject("TrainingBridge").AddComponent<TrainingBridge>();
                 var settings = new SerializedObject(bridge);
@@ -163,7 +165,8 @@ namespace IAFoot.Editor
                 if (!EditorApplication.isPlaying || Time.time < 0.2f)
                     return;
 
-                FootAgent[] agents = Object.FindObjectsByType<FootAgent>(FindObjectsSortMode.InstanceID);
+                FootAgent[] agents = Object.FindObjectsByType<FootAgent>(FindObjectsSortMode.InstanceID)
+                    .Where(a => !WithMix || a.isActiveAndEnabled).ToArray();
                 var channel = (BehaviorChannel)AgentChannel.GetValue(agents.First(a => a.TeamName == "Blue"));
                 BehaviorChannel[] channels = agents.Select(a => (BehaviorChannel)AgentChannel.GetValue(a)).Distinct().ToArray();
                 if (!structureChecked)
@@ -184,7 +187,7 @@ namespace IAFoot.Editor
 
                 int batchesSent = (int)ChannelBatches.GetValue(channel);
                 int version = channel.Policy.Version;
-                bool ready = WithPython ? batchesSent >= (WithSnapshot ? 10 : 4) && version >= 2 : Time.time - phaseStart > 2f;
+                bool ready = WithPython ? batchesSent >= (WithMix ? 40 : WithSnapshot ? 10 : 4) && version >= 2 : Time.time - phaseStart > 2f;
                 if (!ready)
                     return;
 
@@ -197,7 +200,7 @@ namespace IAFoot.Editor
                     Require(agent.ModelVersion == ownVersion, "Modèle : agent désynchronisé de son comportement");
                     Require(!WithPython || ownVersion >= 1, "Modèle : aucune politique reçue de Python.");
                     Require(WithPython || ownVersion == 42, "Modèle : la politique installée n'est pas lue par les agents.");
-                    if (WithSnapshot && agent.TeamName == "Red")
+                    if ((WithSnapshot || WithMix) && agent.TeamName == "Red")
                     {
                         Require(((IList<int>)BufferAgentIds.GetValue(ChannelBuffer.GetValue(ownChannel))).Count == 0,
                             "Snapshot : l'adversaire enregistre des transitions");
@@ -237,9 +240,23 @@ namespace IAFoot.Editor
                 for (int j = i + 1; j < footprints.Count; j++)
                     Require(!footprints[i].Intersects(footprints[j]), $"Grille : {matches[i].name} et {matches[j].name} se chevauchent.");
 
-            Require(agents.Length == ArenaCount * PlayersPerArena, $"Agents : {agents.Length} trouvés.");
+            Require(agents.Length == (WithMix ? 48 : ArenaCount * PlayersPerArena), $"Agents : {agents.Length} trouvés.");
             Require(channel != null, "Agents : canal absent.");
-            if (WithSnapshot)
+            if (WithMix)
+            {
+                Require(ArenaCount == 32, "Mix : test pr?vu pour 32 terrains");
+                Require(agents.Select(a => AgentChannel.GetValue(a)).Distinct().Count() == 3, "Mix : trois canaux attendus");
+                Require(agents.Count(a => a.TeamName == "Blue" && a.RecordsExperience) == 32, "Mix : 32 apprenants");
+                Require(agents.Count(a => a.TeamName == "Red" && !a.RecordsExperience) == 16, "Mix : 16 snapshots sans collecte");
+                Require(matches.Count(m => m.GetTeam(TeamId.Red).players[0].GetComponent<SimpleBotInput>()?.enabled == true) == 16,
+                    "Mix : 16 bots attendus");
+                foreach (var grouping in agents.Where(a => a.TeamName == "Blue").GroupBy(a => a.OpponentGroup))
+                    Require(grouping.Count() == (grouping.Key == "bot" ? 16 : 8), "Mix : mauvais effectif par adversaire");
+                Require(agents.Where(a => a.TeamName == "Blue").All(a => AgentChannel.GetValue(a) == channel), "Mix : apprenants s?par?s");
+                Require(agents.All(a => a.GetComponent<HumanPlayerInput>()?.enabled != true), "Mix : contr?le humain actif");
+                Require(matches.All(m => m.randomSpawns.mode == RoundSpawnMode.AroundBall), "Mix : apparitions modifi?es");
+            }
+            else if (WithSnapshot)
             {
                 Require(agents.Select(a => AgentChannel.GetValue(a)).Distinct().Count() == 2, "Snapshot : deux comportements attendus");
                 Require(agents.Where(a => a.TeamName == "Blue").All(a => AgentChannel.GetValue(a) == channel), "Snapshot : canal bleu incorrect");

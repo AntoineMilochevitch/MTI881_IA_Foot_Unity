@@ -58,6 +58,21 @@ namespace IAFoot.Learning
         [SerializeField] RewardSettings rewards = new RewardSettings();
 
         public int AgentId { get; private set; } = -1;
+        public string OpponentGroup { get; private set; } = string.Empty;
+        public bool RecordsExperience => recordExperience;
+
+        /// <summary>Configuration initiale uniquement, avant l'inscription au pont.
+        /// Ne modifie ni le schéma d'observation, ni les actions, ni les récompenses.</summary>
+        public void ConfigureTrainingRole(string behavior, bool record, string opponentGroup)
+        {
+            if (channel != null || AgentId >= 0)
+                throw new InvalidOperationException("Configurer le rôle avant l'activation du FootAgent.");
+            if (string.IsNullOrWhiteSpace(behavior) || behavior == "*")
+                throw new ArgumentException("Nom de comportement invalide.", nameof(behavior));
+            behaviorName = behavior;
+            recordExperience = record;
+            OpponentGroup = opponentGroup;
+        }
         public string TeamName => player ? player.Team.ToString() : string.Empty;
         /// <summary>Nom de l'arène du joueur (plusieurs arènes en entraînement parallèle).</summary>
         public string ArenaName => player && player.Match ? player.Match.name : string.Empty;

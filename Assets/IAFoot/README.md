@@ -186,3 +186,14 @@ et modèles, définir `IAFOOT_CHECK_PYTHON=1` et lancer avant `python train.py -
 self-play pour vérifier que les copies suivent bien les réglages de la scène. `IAFOOT_CHECK_PORT`
 permet d'utiliser un serveur de test distinct. Les tests vérifient aussi qu'un reset n'affecte pas
 un autre terrain. Le serveur utilisé dans ce cas doit charger les deux politiques.
+
+
+## M?lange fixe d'adversaires sur 32 terrains
+
+Le composant optionnel `ArenaOpponentMix`, sur `ArenaReplicator`, r?partit 16 terrains contre `SimpleBotInput`, 8 contre `FootSnapshotOld` et 8 contre `FootSnapshotRecent`. Les bleus partagent `Foot` et enregistrent ; les rouges restent fixes et n'enregistrent pas.
+
+Hors Play, utiliser **IA Foot > Entra?nement parall?le > Configurer le m?lange 16 bots + 8 anciennes + 8 r?centes**, puis sauvegarder la sc?ne. La source doit contenir un joueur actif par ?quipe, chacun muni d'un FootAgent configur?. Les compteurs et noms de comportements sont visibles sur le composant. D?sactiver ce composant restitue la duplication habituelle. Aucun r?glage de physique, r?compense ou apparition n'est chang?.
+
+Les copies sont configur?es avant leur premi?re activation : aucun agent adverse ne s'inscrit temporairement dans le comportement apprenant. Les contr?leurs concurrents sont d?sactiv?s ; un bot absent est ajout? avec ses r?glages par d?faut. Le hello expose `opponent_group` et `record_experience` par agent, en plus de l'ar?ne et de l'?quipe. Le format des tenseurs reste identique. Attendre les confirmations des deux snapshots avant d'envoyer l'apprenant. Les snapshots doivent rester fig?es pendant toute l'exp?rience.
+
+Validation isol?e : `IAFOOT_CHECK_ARENAS=32`, `IAFOOT_CHECK_MIX=1`, puis `IAFoot.Editor.ArenaReplicatorChecks.RunPlayModeBatch` en batchmode. Ajouter `IAFOOT_CHECK_PYTHON=1` et `IAFOOT_CHECK_PORT` pour exercer 40 batchs via un serveur r?el. Ne jamais lancer ces tests dans le projet ouvert : ils cr?ent une sc?ne temporaire.

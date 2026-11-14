@@ -46,6 +46,7 @@ namespace IAFoot
         [SerializeField] bool offsetSpawnSeeds = true;
 
         readonly List<MatchManager> arenas = new List<MatchManager>();
+        Transform inactiveCopies;
 
         /// <summary>Toutes les arènes actives, la n°0 en premier.</summary>
         public IReadOnlyList<MatchManager> Arenas => arenas;
@@ -88,6 +89,19 @@ namespace IAFoot
             if (!arenaPrefab)
                 Debug.LogWarning("[IA Foot] ArenaReplicator : pas de prefab, l'arène de la scène est clonée telle quelle.", this);
 
+            var opponentMix = GetComponent<ArenaOpponentMix>();
+            if (opponentMix && opponentMix.enabled)
+            {
+                opponentMix.ValidateCount(arenaCount);
+                // Instantiate sur un parent inactif retarde Awake/OnEnable des
+                // copies : leurs agents ne doivent pas s'inscrire sous l'ancien
+                // comportement avant d'avoir reçu leur rôle.
+                var staging = new GameObject("OpponentMix_Initialization");
+                staging.transform.SetParent(transform, false);
+                staging.SetActive(false);
+                inactiveCopies = staging.transform;
+            }
+
             Transform origin = sceneArena ? sceneArena.transform : transform;
             int columnCount = columns > 0 ? columns : AutoColumns(arenaCount);
 
@@ -109,6 +123,20 @@ namespace IAFoot
                 arenas.Add(match);
             }
 
+            if (inactiveCopies)
+            {
+                // Modifier la scène source seulement APRÈS toutes les copies.
+                // Sinon les copies hériteraient du bot affecté à l'arène n°0.
+                for (int i = 0; i < arenas.Count; i++)
+                    opponentMix.Apply(arenas[i], i);
+                foreach (MatchManager match in arenas)
+                    if (match.transform.parent == inactiveCopies)
+                        match.transform.SetParent(transform, true);
+                Destroy(inactiveCopies.gameObject);
+                inactiveCopies = null;
+                Debug.Log("[IA Foot] Mélange actif : Foot apprend ; bot / FootSnapshotOld / FootSnapshotRecent restent fixes.", this);
+            }
+
             if (arenaCount > 1)
                 Debug.Log($"[IA Foot] {arenas.Count} arènes en parallèle (grille de {columnCount} colonne(s), " +
                           $"pas {step.x:0.##} x {step.y:0.##}).", this);
@@ -118,7 +146,7 @@ namespace IAFoot
 
         MatchManager CreateArena(GameObject source, int index, Vector3 position, Quaternion rotation)
         {
-            GameObject copy = Instantiate(source, position, rotation, transform);
+            GameObject copy = Instantiate(source, position, rotation, inactiveCopies ? inactiveCopies : transform);
             copy.name = ArenaName(index);
             var match = copy.GetComponent<MatchManager>();
             // Graine lue au premier placement (Start du MatchManager) : la modifier ici suffit.
