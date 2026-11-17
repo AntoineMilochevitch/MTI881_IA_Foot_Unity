@@ -557,9 +557,21 @@ PrefabInstance:
       propertyPath: randomSpawns.areaSize.y
       value: 1.8
       objectReference: {fileID: 0}
+    - target: {fileID: 1424430458285068600, guid: 9fb66e8284c9d7a45bf297c33b978964, type: 3}
+      propertyPath: m_IsActive
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 1469698526248709811, guid: 9fb66e8284c9d7a45bf297c33b978964, type: 3}
       propertyPath: rewards.ballTouch
       value: 0.005
+      objectReference: {fileID: 0}
+    - target: {fileID: 1932833588127415312, guid: 9fb66e8284c9d7a45bf297c33b978964, type: 3}
+      propertyPath: m_Enabled
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 4844644761577173365, guid: 9fb66e8284c9d7a45bf297c33b978964, type: 3}
+      propertyPath: m_Enabled
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 4844644761577173365, guid: 9fb66e8284c9d7a45bf297c33b978964, type: 3}
       propertyPath: behaviorName
@@ -568,6 +580,10 @@ PrefabInstance:
     - target: {fileID: 4844644761577173365, guid: 9fb66e8284c9d7a45bf297c33b978964, type: 3}
       propertyPath: recordExperience
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5965993159232953724, guid: 9fb66e8284c9d7a45bf297c33b978964, type: 3}
+      propertyPath: m_Enabled
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 7081478752627128803, guid: 9fb66e8284c9d7a45bf297c33b978964, type: 3}
       propertyPath: m_LocalPosition.x
@@ -612,6 +628,10 @@ PrefabInstance:
     - target: {fileID: 7796416765921822215, guid: 9fb66e8284c9d7a45bf297c33b978964, type: 3}
       propertyPath: m_Name
       value: Arena
+      objectReference: {fileID: 0}
+    - target: {fileID: 8051431026826320682, guid: 9fb66e8284c9d7a45bf297c33b978964, type: 3}
+      propertyPath: m_Enabled
+      value: 1
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []

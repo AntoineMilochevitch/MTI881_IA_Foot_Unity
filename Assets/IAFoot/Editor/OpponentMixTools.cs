@@ -8,7 +8,13 @@ namespace IAFoot.Editor
     public static class OpponentMixTools
     {
         [MenuItem("IA Foot/Entraînement parallèle/Configurer le mélange 16 bots + 8 anciennes + 8 récentes")]
-        static void ConfigureScene()
+        static void ConfigureScene() => ConfigureScene(8);
+
+        [MenuItem("IA Foot/Entraînement parallèle/Configurer le mélange 16 bots + 16 snapshots")]
+        static void ConfigureTwoGroups() => ConfigureScene(16);
+
+        // Le reste des terrains re?oit le groupe r?cent ; z?ro reste donne deux groupes.
+        static void ConfigureScene(int snapshotCount)
         {
             if (EditorApplication.isPlayingOrWillChangePlaymode)
                 throw new InvalidOperationException("Arrêter Play avant de configurer le mélange.");
@@ -25,7 +31,7 @@ namespace IAFoot.Editor
             Undo.RecordObject(mix, "Configurer le mélange d'adversaires");
             var mixSettings = new SerializedObject(mix);
             mixSettings.FindProperty("botArenaCount").intValue = 16;
-            mixSettings.FindProperty("oldSnapshotArenaCount").intValue = 8;
+            mixSettings.FindProperty("oldSnapshotArenaCount").intValue = snapshotCount;
             mixSettings.FindProperty("learnerBehavior").stringValue = "Foot";
             mixSettings.FindProperty("oldSnapshotBehavior").stringValue = "FootSnapshotOld";
             mixSettings.FindProperty("recentSnapshotBehavior").stringValue = "FootSnapshotRecent";
@@ -33,8 +39,9 @@ namespace IAFoot.Editor
             mix.enabled = true;
             EditorSceneManager.MarkSceneDirty(replicator.gameObject.scene);
             Selection.activeGameObject = replicator.gameObject;
-            Debug.Log("[IA Foot] Mélange configuré. Sauvegarder la scène puis lancer Python avec les deux --opponent avant Play. " +
-                      "Désactiver ArenaOpponentMix pour revenir à la configuration habituelle.");
+            Debug.Log("[IA Foot] Melange configure. Sauvegarder la scene puis lancer Python avec " +
+                      (snapshotCount == 16 ? "--opponent FootSnapshotOld <checkpoint>" : "les deux --opponent") + " avant Play. " +
+                      "Desactiver ArenaOpponentMix pour revenir a la configuration habituelle.");
         }
     }
 }

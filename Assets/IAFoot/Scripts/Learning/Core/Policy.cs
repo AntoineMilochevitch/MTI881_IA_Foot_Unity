@@ -50,6 +50,7 @@ namespace IAFoot.Learning
         static readonly Dictionary<string, Builder> Builders = new Dictionary<string, Builder>
         {
             ["direct"] = DirectDecoder.Build,
+            ["direct_logits"] = DirectDecoder.Build,
             ["discrete"] = DiscreteDecoder.Build,
         };
 
@@ -80,11 +81,14 @@ namespace IAFoot.Learning
         readonly ActionSpec actions;
         readonly float[] logStd;
         readonly bool deterministic;
+        readonly bool stableBinaryLogProb;
 
-        public DirectDecoder(ActionSpec actions, float[] logStd, bool deterministic)
+        public DirectDecoder(ActionSpec actions, float[] logStd, bool deterministic,
+            bool stableBinaryLogProb = false)
         {
             this.actions = actions;
             this.deterministic = deterministic;
+            this.stableBinaryLogProb = stableBinaryLogProb;
             this.logStd = new float[actions.Count];
             if (logStd.Length != 1 && logStd.Length != actions.Count)
                 throw new FormatException($"decoder direct : 'log_std' doit avoir 1 ou {actions.Count} éléments");
@@ -97,7 +101,8 @@ namespace IAFoot.Learning
         public static IActionDecoder Build(Dictionary<string, object> spec, ModelBuildContext context, ActionSpec actions)
         {
             float[] logStd = context.Optional(spec, "log_std", "decoder")?.AsFloats() ?? new[] { -0.7f };
-            return new DirectDecoder(actions, logStd, spec.GetBool("deterministic"));
+            return new DirectDecoder(actions, logStd, spec.GetBool("deterministic"),
+                spec.GetString("type", "direct") == "direct_logits");
         }
 
         public void Decode(float[] modelOutput, Random random, float[] action, out float logProbability, out int index)
@@ -109,7 +114,12 @@ namespace IAFoot.Learning
                 float raw = modelOutput[i];
                 if (actions.Dims[i].IsBinary)
                 {
-                    float p = Activations.Sigmoid(raw);
+                    // Le nouveau mode conserve les petites probabilités en double
+                    // pour le tirage et calcule la log-probabilité depuis le logit.
+                    // Le mode direct historique reste compatible avec les anciens clients.
+                    double p = stableBinaryLogProb
+                        ? 1.0 / (1.0 + Math.Exp(-(double)raw))
+                        : Activations.Sigmoid(raw);
                     if (deterministic)
                     {
                         action[i] = raw > 0f ? 1f : 0f;
@@ -117,7 +127,9 @@ namespace IAFoot.Learning
                     }
                     bool pressed = random.NextDouble() < p;
                     action[i] = pressed ? 1f : 0f;
-                    logProbability += MathF.Log(MathF.Max(pressed ? p : 1f - p, 1e-8f));
+                    logProbability += stableBinaryLogProb
+                        ? BinaryLogProbability(raw, pressed)
+                        : MathF.Log(MathF.Max(pressed ? (float)p : 1f - (float)p, 1e-8f));
                 }
                 else
                 {
@@ -133,7 +145,19 @@ namespace IAFoot.Learning
             }
         }
 
-        public string Describe() => deterministic ? "direct (déterministe)" : "direct (gaussienne + Bernoulli)";
+        /// <summary>
+        /// log P(a|logit) = -softplus(-logit) si appuyé, -softplus(logit) sinon.
+        /// Pas de soustraction 1-p ni de plancher artificiel de probabilité.
+        /// Le calcul en double évite les pertes de précision avant conversion finale.
+        /// </summary>
+        public static float BinaryLogProbability(float logit, bool pressed)
+        {
+            double z = pressed ? -(double)logit : logit;
+            return (float)-(Math.Max(z, 0.0) + Math.Log(1.0 + Math.Exp(-Math.Abs(z))));
+        }
+
+        public string Describe() => (stableBinaryLogProb ? "direct_logits" : "direct")
+            + (deterministic ? " (déterministe)" : " (gaussienne + Bernoulli)");
 
         static float NextGaussian(Random random)
         {

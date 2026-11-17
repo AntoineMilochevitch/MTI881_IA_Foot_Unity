@@ -49,6 +49,7 @@ namespace IAFoot.Editor
         static bool WithPython => Environment.GetEnvironmentVariable("IAFOOT_CHECK_PYTHON") == "1";
         // Exerce la scène comme source, avec un prefab volontairement resté en self-play.
         static bool WithMix => Environment.GetEnvironmentVariable("IAFOOT_CHECK_MIX") == "1";
+        static readonly int OldSnapshotCount = Environment.GetEnvironmentVariable("IAFOOT_CHECK_TWO_GROUPS") == "1" ? 16 : 8;
         static bool WithSnapshot => Environment.GetEnvironmentVariable("IAFOOT_CHECK_SNAPSHOT") == "1";
 
         public static void RunPlayModeBatch()
@@ -80,7 +81,14 @@ namespace IAFoot.Editor
 
                 var replicator = new GameObject("ArenaReplicator").AddComponent<ArenaReplicator>();
                 replicator.Configure(prefab, sceneArena, ArenaCount);
-                if (WithMix) replicator.gameObject.AddComponent<ArenaOpponentMix>();
+                if (WithMix)
+                {
+                    var mix = replicator.gameObject.AddComponent<ArenaOpponentMix>();
+                    var mixSettings = new SerializedObject(mix);
+                    mixSettings.FindProperty("oldSnapshotArenaCount").intValue = OldSnapshotCount;
+                    mixSettings.ApplyModifiedPropertiesWithoutUndo();
+                    mix.ValidateCount(ArenaCount);
+                }
 
                 var bridge = new GameObject("TrainingBridge").AddComponent<TrainingBridge>();
                 var settings = new SerializedObject(bridge);
@@ -245,13 +253,13 @@ namespace IAFoot.Editor
             if (WithMix)
             {
                 Require(ArenaCount == 32, "Mix : test pr?vu pour 32 terrains");
-                Require(agents.Select(a => AgentChannel.GetValue(a)).Distinct().Count() == 3, "Mix : trois canaux attendus");
+                Require(agents.Select(a => AgentChannel.GetValue(a)).Distinct().Count() == (OldSnapshotCount == 16 ? 2 : 3), "Mix : nombre de canaux incorrect");
                 Require(agents.Count(a => a.TeamName == "Blue" && a.RecordsExperience) == 32, "Mix : 32 apprenants");
                 Require(agents.Count(a => a.TeamName == "Red" && !a.RecordsExperience) == 16, "Mix : 16 snapshots sans collecte");
                 Require(matches.Count(m => m.GetTeam(TeamId.Red).players[0].GetComponent<SimpleBotInput>()?.enabled == true) == 16,
                     "Mix : 16 bots attendus");
                 foreach (var grouping in agents.Where(a => a.TeamName == "Blue").GroupBy(a => a.OpponentGroup))
-                    Require(grouping.Count() == (grouping.Key == "bot" ? 16 : 8), "Mix : mauvais effectif par adversaire");
+                    Require(grouping.Count() == (grouping.Key == "bot" ? 16 : grouping.Key == "snapshot_old" ? OldSnapshotCount : 16 - OldSnapshotCount), "Mix : mauvais effectif par adversaire");
                 Require(agents.Where(a => a.TeamName == "Blue").All(a => AgentChannel.GetValue(a) == channel), "Mix : apprenants s?par?s");
                 Require(agents.All(a => a.GetComponent<HumanPlayerInput>()?.enabled != true), "Mix : contr?le humain actif");
                 Require(matches.All(m => m.randomSpawns.mode == RoundSpawnMode.AroundBall), "Mix : apparitions modifi?es");

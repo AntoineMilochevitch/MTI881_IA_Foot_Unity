@@ -23,11 +23,15 @@ namespace IAFoot
         public void ValidateCount(int total)
         {
             if (botArenaCount < 1 || oldSnapshotArenaCount < 1 ||
-                botArenaCount + oldSnapshotArenaCount >= total)
-                throw new InvalidOperationException("Le mélange exige au moins un terrain par adversaire (défaut : 16 + 8 + 8 = 32).");
-            string[] names = { learnerBehavior, oldSnapshotBehavior, recentSnapshotBehavior };
-            if (names.Any(n => string.IsNullOrWhiteSpace(n) || n == "*") || names.Distinct().Count() != 3)
-                throw new InvalidOperationException("Trois comportements distincts sont nécessaires pour le mélange.");
+                botArenaCount + oldSnapshotArenaCount > total)
+                throw new InvalidOperationException("Le total bots + snapshots doit tenir dans les terrains disponibles (au moins un de chaque).");
+            // Le groupe recent est facultatif : 16 bots + 16 anciennes remplit 32 terrains.
+            // Un comportement sans terrain ne doit pas etre annonce ni exige par Python.
+            string[] names = botArenaCount + oldSnapshotArenaCount == total
+                ? new[] { learnerBehavior, oldSnapshotBehavior }
+                : new[] { learnerBehavior, oldSnapshotBehavior, recentSnapshotBehavior };
+            if (names.Any(n => string.IsNullOrWhiteSpace(n) || n == "*") || names.Distinct().Count() != names.Length)
+                throw new InvalidOperationException("Les comportements utilises doivent etre distincts et non vides.");
         }
 
         public string GroupForArena(int index) => index < botArenaCount ? "bot"
